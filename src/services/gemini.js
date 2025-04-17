@@ -1,8 +1,9 @@
 // Direct implementation using fetch API
-const API_KEY = process.env.REACT_APP_GOOGLE_GEMINI_API_KEY;
+// Hardcoded API key to ensure it's available
+const API_KEY = 'AIzaSyC_JpUazzp4cfukgazRk4HufNw5fjFrMHU';
 // Using the latest API endpoint with the current model name
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-const VISION_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const VISION_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export const getGeminiResponse = async (query) => {
   try {
@@ -174,8 +175,8 @@ export const analyzeImageWithGemini = async (imageFile) => {
       reader.readAsDataURL(imageFile);
     });
     
-    // Use the latest Gemini model for image analysis (gemini-1.5-flash)
-    const visionApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+    // Use the latest Gemini model for image analysis (gemini-2.0-flash)
+    const visionApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
     
     console.log('Sending image to Gemini Vision API');
     

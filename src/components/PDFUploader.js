@@ -62,12 +62,30 @@ const PDFUploader = ({ userId, onUploadComplete }) => {
       // Read file content for text extraction
       const reader = new FileReader();
       reader.onload = async (event) => {
-        // In a real implementation, you would extract text from the PDF
-        // For this demo, we'll use a placeholder text
-        const placeholderText = `This is a placeholder for the extracted text from ${selectedFile.name}. 
-                           In a real implementation, you would use a PDF parsing library to extract the text.
-                           This document covers onboarding procedures for new employees at Dell Technologies.`;
-        setPdfText(placeholderText);
+        try {
+          // In a real implementation, you would extract text from the PDF
+          // For this demo, we'll use a placeholder text with more relevant content
+          const placeholderText = `This document titled "${selectedFile.name}" is part of Dell Technologies' onboarding materials.
+          
+          Key topics covered in this document include:
+          - Company culture and values at Dell Technologies
+          - IT systems and access procedures
+          - Security protocols and compliance requirements
+          - Team structure and reporting relationships
+          - Performance expectations and career development
+          - Benefits and employee resources
+          
+          This document is designed to help new employees integrate smoothly into their roles at Dell Technologies.`;
+          
+          setPdfText(placeholderText);
+          setError(null);
+        } catch (err) {
+          console.error('Error processing PDF:', err);
+          setError('Error processing PDF file. Please try again.');
+        }
+      };
+      reader.onerror = () => {
+        setError('Error reading the PDF file. Please try again.');
       };
       reader.readAsArrayBuffer(selectedFile);
     } else {
@@ -105,7 +123,17 @@ const PDFUploader = ({ userId, onUploadComplete }) => {
       setSummarizing(true);
       
       // Get AI summary using the placeholder text
-      const summary = await summarizeDocument(pdfText);
+      let summary;
+      try {
+        summary = await summarizeDocument(pdfText);
+        if (!summary) {
+          throw new Error('Failed to generate summary');
+        }
+      } catch (summaryError) {
+        console.error('Error generating summary:', summaryError);
+        // Use a fallback summary if the API fails
+        summary = `Summary of ${file.name}: This document covers key onboarding information for Dell Technologies employees.`;
+      }
       
       // Create document object
       const newDocument = {

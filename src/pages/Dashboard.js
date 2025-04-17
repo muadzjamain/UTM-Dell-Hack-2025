@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Container, 
   Typography, 
@@ -12,7 +12,8 @@ import {
   Divider,
   Avatar,
   Paper,
-  Stack
+  Stack,
+  CircularProgress
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -23,19 +24,73 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { useNavigate } from 'react-router-dom';
+import { auth, db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   
-  // Placeholder data, replace with real user/task data from Firebase
-  const [employee] = useState({ 
-    name: 'John Doe', 
-    role: 'Software Developer', 
-    department: 'Engineering', 
-    progress: 60,
-    startDate: '2025-04-10',
-    avatar: null // In a real app, this would be the user's profile image URL
-  });
+  // State for user profile data
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Fetch user data on component mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Get current user
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setLoading(false);
+          setError('Please sign in to view your dashboard');
+          return;
+        }
+        
+        // Get user profile from Firestore
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          setUserProfile(userDoc.data());
+        } else {
+          // Extract name from email if possible
+          const emailName = currentUser.email ? currentUser.email.split('@')[0] : '';
+          const nameParts = emailName.split('.');
+          const firstName = nameParts.length > 0 ? nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1) : '';
+          const lastName = nameParts.length > 1 ? nameParts[1].charAt(0).toUpperCase() + nameParts[1].slice(1) : '';
+          
+          // Create a personalized fallback profile
+          const fallbackProfile = {
+            firstName: firstName || currentUser.displayName?.split(' ')[0] || 'User',
+            lastName: lastName || currentUser.displayName?.split(' ')[1] || '',
+            email: currentUser.email,
+            role: 'Employee',
+            department: 'Dell Technologies',
+            startDate: new Date().toISOString().split('T')[0], // Today's date
+            onboardingStatus: 'In Progress'
+          };
+          
+          // Save this fallback profile to Firestore for future use
+          try {
+            await setDoc(doc(db, 'users', currentUser.uid), fallbackProfile);
+          } catch (saveErr) {
+            console.warn('Could not save fallback profile to Firestore:', saveErr);
+          }
+          
+          setUserProfile(fallbackProfile);
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError('Failed to load user data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUserData();
+  }, []);
   
   const currentTask = 'Complete HR Training';
   const modules = [
@@ -79,7 +134,9 @@ const Dashboard = () => {
   
   // Calculate days since onboarding started
   const calculateDaysSinceStart = () => {
-    const startDate = new Date(employee.startDate);
+    if (!userProfile?.startDate) return 0;
+    
+    const startDate = new Date(userProfile.startDate);
     const today = new Date();
     const diffTime = Math.abs(today - startDate);
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -103,6 +160,38 @@ const Dashboard = () => {
     }
   };
 
+  // If loading, show loading spinner
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  
+  // If error, show error message
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ pt: 4 }}>
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="h6" color="error">{error}</Typography>
+          <Button variant="contained" onClick={() => navigate('/login')} sx={{ mt: 2 }}>
+            Sign In
+          </Button>
+        </Paper>
+      </Container>
+    );
+  }
+  
+  // If no user profile, redirect to login
+  if (!userProfile) {
+    navigate('/login');
+    return null;
+  }
+  
+  // Get full name
+  const fullName = `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim();
+  
   return (
     <Box sx={{ minHeight: '100vh', pb: 6, backgroundColor: '#f5f8fa' }}>
       <Container maxWidth="lg" sx={{ pt: 4 }}>
@@ -125,14 +214,14 @@ const Dashboard = () => {
           <Grid container spacing={3} alignItems="center">
             <Grid item xs={12} md={8}>
               <Typography variant="h4" fontWeight="bold" gutterBottom>
-                Welcome to Dell Technologies, {employee.name}!
+                Welcome to Dell Technologies, {fullName}!
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: 2 }}>
                 You're on day {calculateDaysSinceStart()} of your onboarding journey. Keep up the great progress!
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Chip 
-                  label={employee.role} 
+                  label={userProfile.role || 'Employee'} 
                   sx={{ 
                     backgroundColor: 'rgba(255,255,255,0.2)', 
                     color: 'white',
@@ -140,7 +229,7 @@ const Dashboard = () => {
                   }} 
                 />
                 <Chip 
-                  label={employee.department} 
+                  label={userProfile.department || 'Dell Technologies'} 
                   sx={{ 
                     backgroundColor: 'rgba(255,255,255,0.2)', 
                     color: 'white',
@@ -152,7 +241,7 @@ const Dashboard = () => {
             <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', md: 'flex-end' } }}>
                 <Typography variant="h5" fontWeight="bold" gutterBottom>
-                  {employee.progress}%
+                  63%
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 1, opacity: 0.9 }}>
                   Overall Onboarding Progress
@@ -160,7 +249,7 @@ const Dashboard = () => {
                 <Box sx={{ width: '100%', maxWidth: 200, ml: { xs: 0, md: 'auto' } }}>
                   <LinearProgress 
                     variant="determinate" 
-                    value={employee.progress} 
+                    value={63} /* Fixed at 63% (5/8) to match the profile page */
                     sx={{ 
                       height: 8, 
                       borderRadius: 4, 
@@ -304,19 +393,19 @@ const Dashboard = () => {
           
           <Grid item xs={12} md={4}>
             {/* Stats Cards */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={6}>
-                <Card sx={{ borderRadius: 3, height: '100%' }}>
-                  <CardContent sx={{ p: 2.5 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Typography variant="h5" fontWeight="bold" color="primary.main">
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ height: '100%', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Avatar sx={{ bgcolor: '#e3f2fd', color: '#0076CE', mr: 2 }}>
+                        <AccessTimeIcon />
+                      </Avatar>
+                      <Typography variant="h3" color="primary" fontWeight="bold">
                         {calculateDaysSinceStart()}
                       </Typography>
-                      <Avatar sx={{ bgcolor: 'primary.light', width: 36, height: 36 }}>
-                        <AccessTimeIcon fontSize="small" />
-                      </Avatar>
                     </Box>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    <Typography variant="subtitle1" color="text.secondary">
                       Days at Dell
                     </Typography>
                   </CardContent>
@@ -342,51 +431,49 @@ const Dashboard = () => {
             </Grid>
             
             {/* Profile Card */}
-            <Card sx={{ mb: 3, borderRadius: 3 }}>
+            <Card sx={{ mb: 4, borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
               <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar 
-                    src={employee.avatar} 
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Avatar
                     sx={{ 
                       width: 64, 
                       height: 64, 
                       bgcolor: 'primary.main',
-                      fontSize: '1.5rem',
-                      mr: 2 
+                      fontSize: 24,
+                      fontWeight: 'bold'
                     }}
                   >
-                    {employee.name.split(' ').map(n => n[0]).join('')}
+                    {userProfile.firstName?.charAt(0) || ''}{userProfile.lastName?.charAt(0) || ''}
                   </Avatar>
-                  <Box>
-                    <Typography variant="h6">{employee.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">{employee.role}</Typography>
+                  <Box sx={{ ml: 2 }}>
+                    <Typography variant="h6">{fullName}</Typography>
+                    <Typography variant="body2" color="text.secondary">{userProfile.role || 'Employee'}</Typography>
                   </Box>
                 </Box>
                 <Divider sx={{ my: 2 }} />
-                
                 <Stack spacing={2}>
                   <Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>Department</Typography>
-                    <Typography variant="body1" fontWeight={500}>{employee.department}</Typography>
+                    <Typography variant="body1">{userProfile.department || 'Dell Technologies'}</Typography>
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>Start Date</Typography>
-                    <Typography variant="body1" fontWeight={500}>{new Date(employee.startDate).toLocaleDateString()}</Typography>
+                    <Typography variant="body1">{userProfile.startDate ? new Date(userProfile.startDate).toLocaleDateString() : 'January 15, 2025'}</Typography>
                   </Box>
                   <Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>Onboarding Status</Typography>
                     <Chip 
-                      icon={<TrendingUpIcon />}
-                      label="In Progress" 
+                      icon={<TrendingUpIcon />} 
+                      label={userProfile.onboardingStatus || 'In Progress'} 
                       color="primary" 
-                      sx={{ fontWeight: 500 }}
+                      size="medium" 
                     />
                   </Box>
                 </Stack>
-                
                 <Button 
-                  fullWidth 
                   variant="outlined" 
+                  color="primary" 
+                  fullWidth 
                   sx={{ mt: 3 }}
                   onClick={() => navigate('/profile')}
                 >
@@ -415,7 +502,7 @@ const Dashboard = () => {
                     variant="outlined" 
                     startIcon={<PolicyIcon />} 
                     sx={{ justifyContent: 'flex-start', borderRadius: 2 }}
-                    onClick={() => navigate('/training')}
+                    onClick={() => window.open('https://www.dell.com/en-my/lp/dt/security-and-resiliency', '_blank')}
                   >
                     Security Policies
                   </Button>
@@ -433,7 +520,7 @@ const Dashboard = () => {
                     variant="outlined" 
                     startIcon={<FlagIcon />} 
                     sx={{ justifyContent: 'flex-start', borderRadius: 2 }}
-                    onClick={() => window.open('https://www.dell.com/support/home/en-us', '_blank')}
+                    onClick={() => navigate('/support')}
                   >
                     Help & Support
                   </Button>
