@@ -1,0 +1,107 @@
+/* Animation styles for chat components */
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+/* Animation classes */
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #1976d2;
+  border-radius: 50%;
+  display: inline-block;
+  margin: 0 2px;
+}
+
+.typing-dot:nth-child(1) {
+  animation: pulse 1s infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation: pulse 1s infinite 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation: pulse 1s infinite 0.4s;
+}
+
+.user-message {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.bot-message {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.suggestion-chip {
+  transition: all 0.2s ease;
+}
+
+.suggestion-chip:hover {
+  transform: scale(1.05);
+}
+
+.modal-enter {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.floating-icon {
+  animation: float 3s ease-in-out infinite;
+}
