@@ -28,14 +28,16 @@ import {
   FormControlLabel,
   Radio,
   RadioGroup,
-  Tooltip
+  Tooltip,
+  LinearProgress
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
-import SchoolIcon from '@mui/icons-material/School';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import CloseIcon from '@mui/icons-material/Close';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 import ImageIcon from '@mui/icons-material/Image';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SummarizeIcon from '@mui/icons-material/Summarize';
@@ -66,6 +68,9 @@ const StudyCompanion = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
+  
+  // Tab states (matching EduZen design)
+  const [tabValue, setTabValue] = useState(0); // 0: Upload Content, 1: Summary, 2: Quiz, 3: Study Plan
   
   // Content upload states
   const [uploadType, setUploadType] = useState('image'); // 'image', 'camera', 'pdf'
@@ -343,7 +348,7 @@ const StudyCompanion = () => {
       
       // Show success message and navigate to summary tab
       setSuccess('Content analyzed successfully!');
-      setActiveTab(1);
+      setTabValue(1);
       
       // Clear success message after 3 seconds
       setTimeout(() => {
@@ -391,27 +396,42 @@ const StudyCompanion = () => {
   
   // Render the main UI
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ 
         p: 4, 
-        borderRadius: 2, 
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-        overflow: 'hidden'
+        borderRadius: 3, 
+        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.08)',
+        overflow: 'hidden',
+        background: 'linear-gradient(to right bottom, #ffffff, #f8f9fa)',
+        border: '1px solid rgba(0, 0, 0, 0.05)'
       }}>
         <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ 
-          color: '#4285F4', 
-          fontWeight: 500,
+          color: '#1565C0', 
+          fontWeight: 600,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          mb: 3
+          mb: 3,
+          position: 'relative',
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            bottom: -10,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '80px',
+            height: '4px',
+            backgroundColor: '#1565C0',
+            borderRadius: '2px'
+          }
         }}>
-          <SchoolIcon sx={{ mr: 1, fontSize: 36 }} />
-          AI Study Companion
+          <MenuBookIcon sx={{ mr: 1.5, fontSize: 40, color: '#1565C0' }} />
+          Training
         </Typography>
         
         <Typography variant="body1" paragraph align="center" sx={{ mb: 4 }}>
-          Upload your study materials or capture images with your camera. Our AI will extract the text, generate a summary, and create a quiz to help you study.
+          Upload your study materials or capture images with your camera. Our AI will extract the text, generate a
+          summary, and create a quiz to help you study.
         </Typography>
         
         {/* Error and success messages */}
@@ -433,26 +453,34 @@ const StudyCompanion = () => {
           </Alert>
         )}
         
-        {/* Main tabs */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        {/* Main tabs - EduZen style */}
+        <Box sx={{ mb: 4, mt: 4 }}>
           <Tabs 
-            value={activeTab} 
-            onChange={handleTabChange} 
-            aria-label="study companion tabs"
+            value={tabValue} 
+            onChange={(e, newValue) => setTabValue(newValue)} 
+            aria-label="training tabs"
             variant="fullWidth"
             sx={{
               '& .MuiTab-root': {
-                borderRadius: '20px 20px 0 0',
                 minHeight: '64px',
                 fontWeight: 500,
+                borderRadius: '8px 8px 0 0',
+                transition: 'all 0.3s ease',
+                mx: 0.5,
+                '&:hover': {
+                  backgroundColor: 'rgba(21, 101, 192, 0.04)',
+                  color: '#1565C0'
+                }
               },
               '& .Mui-selected': {
-                color: '#4285F4',
+                color: '#1565C0',
                 fontWeight: 600,
+                backgroundColor: 'rgba(21, 101, 192, 0.08)'
               },
               '& .MuiTabs-indicator': {
-                backgroundColor: '#4285F4',
-                height: 3,
+                backgroundColor: '#1565C0',
+                height: 4,
+                borderRadius: '4px 4px 0 0'
               }
             }}
           >
@@ -461,6 +489,7 @@ const StudyCompanion = () => {
               label="Upload Content" 
               id="tab-0" 
               aria-controls="tabpanel-0" 
+              iconPosition="start"
             />
             <Tab 
               icon={<SummarizeIcon />} 
@@ -468,13 +497,15 @@ const StudyCompanion = () => {
               id="tab-1" 
               aria-controls="tabpanel-1"
               disabled={!summary} 
+              iconPosition="start"
             />
             <Tab 
               icon={<QuizIcon />} 
               label="Quiz" 
               id="tab-2" 
               aria-controls="tabpanel-2"
-              disabled={!quiz.length} 
+              disabled={!quiz.length}
+              iconPosition="start" 
             />
             <Tab 
               icon={<CalendarMonthIcon />} 
@@ -482,49 +513,65 @@ const StudyCompanion = () => {
               id="tab-3" 
               aria-controls="tabpanel-3"
               disabled={!summary} 
+              iconPosition="start"
             />
           </Tabs>
         </Box>
         
         {/* Tab panels */}
-        <Box role="tabpanel" hidden={activeTab !== 0} id="tabpanel-0" aria-labelledby="tab-0">
-          {activeTab === 0 && (
+        <Box role="tabpanel" hidden={tabValue !== 0} id="tabpanel-0" aria-labelledby="tab-0">
+          {tabValue === 0 && (
             <Box>
               <Grid container spacing={3} justifyContent="center">
                 {/* Upload options */}
                 <Grid item xs={12} md={4}>
                   <Card 
-                    elevation={2} 
+                    elevation={uploadType === 'image' ? 4 : 1} 
                     sx={{ 
                       height: '100%', 
                       display: 'flex', 
                       flexDirection: 'column',
                       alignItems: 'center',
                       cursor: 'pointer',
-                      transition: 'all 0.3s',
+                      transition: 'all 0.3s ease',
                       '&:hover': {
-                        transform: 'translateY(-5px)',
-                        boxShadow: '0 12px 20px rgba(0, 0, 0, 0.1)'
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 16px 30px rgba(21, 101, 192, 0.15)'
                       },
-                      border: uploadType === 'image' ? '2px solid #4285F4' : 'none',
-                      borderRadius: '20px'
+                      border: uploadType === 'image' ? '2px solid #1565C0' : '1px solid rgba(0, 0, 0, 0.08)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      '&::before': uploadType === 'image' ? {
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '4px',
+                        backgroundColor: '#1565C0',
+                        borderRadius: '4px 4px 0 0'
+                      } : {}
                     }}
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <CardContent sx={{ textAlign: 'center', p: 3 }}>
                       <Box 
                         sx={{ 
-                          backgroundColor: 'rgba(66, 133, 244, 0.1)', 
+                          backgroundColor: 'rgba(21, 101, 192, 0.08)', 
                           borderRadius: '50%', 
-                          width: 80, 
-                          height: 80, 
+                          width: 90, 
+                          height: 90, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          margin: '0 auto 16px'
+                          margin: '0 auto 20px',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 4px 12px rgba(21, 101, 192, 0.1)',
+                          border: '1px solid rgba(21, 101, 192, 0.15)'
                         }}
                       >
-                        <ImageIcon sx={{ fontSize: 40, color: '#4285F4' }} />
+                        <ImageIcon sx={{ fontSize: 45, color: '#1565C0' }} />
                       </Box>
                       <Typography variant="h6" component="div" gutterBottom>
                         Upload Image
@@ -564,17 +611,20 @@ const StudyCompanion = () => {
                     <CardContent sx={{ textAlign: 'center', p: 3 }}>
                       <Box 
                         sx={{ 
-                          backgroundColor: 'rgba(52, 168, 83, 0.1)', 
+                          backgroundColor: 'rgba(21, 101, 192, 0.08)', 
                           borderRadius: '50%', 
-                          width: 80, 
-                          height: 80, 
+                          width: 90, 
+                          height: 90, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          margin: '0 auto 16px'
+                          margin: '0 auto 20px',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 4px 12px rgba(21, 101, 192, 0.1)',
+                          border: '1px solid rgba(21, 101, 192, 0.15)'
                         }}
                       >
-                        <CameraAltIcon sx={{ fontSize: 40, color: '#34A853' }} />
+                        <CameraAltIcon sx={{ fontSize: 45, color: '#1565C0' }} />
                       </Box>
                       <Typography variant="h6" component="div" gutterBottom>
                         Capture Image
@@ -588,37 +638,52 @@ const StudyCompanion = () => {
                 
                 <Grid item xs={12} md={4}>
                   <Card 
-                    elevation={2} 
+                    elevation={uploadType === 'pdf' ? 4 : 1} 
                     sx={{ 
                       height: '100%', 
                       display: 'flex', 
                       flexDirection: 'column',
                       alignItems: 'center',
                       cursor: 'pointer',
-                      transition: 'all 0.3s',
+                      transition: 'all 0.3s ease',
                       '&:hover': {
-                        transform: 'translateY(-5px)',
-                        boxShadow: '0 12px 20px rgba(0, 0, 0, 0.1)'
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 16px 30px rgba(21, 101, 192, 0.15)'
                       },
-                      border: uploadType === 'pdf' ? '2px solid #4285F4' : 'none',
-                      borderRadius: '20px'
+                      border: uploadType === 'pdf' ? '2px solid #1565C0' : '1px solid rgba(0, 0, 0, 0.08)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      '&::before': uploadType === 'pdf' ? {
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '4px',
+                        backgroundColor: '#1565C0',
+                        borderRadius: '4px 4px 0 0'
+                      } : {}
                     }}
                     onClick={() => pdfInputRef.current?.click()}
                   >
                     <CardContent sx={{ textAlign: 'center', p: 3 }}>
                       <Box 
                         sx={{ 
-                          backgroundColor: 'rgba(234, 67, 53, 0.1)', 
+                          backgroundColor: 'rgba(21, 101, 192, 0.08)', 
                           borderRadius: '50%', 
-                          width: 80, 
-                          height: 80, 
+                          width: 90, 
+                          height: 90, 
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          margin: '0 auto 16px'
+                          margin: '0 auto 20px',
+                          transition: 'all 0.3s ease',
+                          boxShadow: '0 4px 12px rgba(21, 101, 192, 0.1)',
+                          border: '1px solid rgba(21, 101, 192, 0.15)'
                         }}
                       >
-                        <PictureAsPdfIcon sx={{ fontSize: 40, color: '#EA4335' }} />
+                        <PictureAsPdfIcon sx={{ fontSize: 45, color: '#1565C0' }} />
                       </Box>
                       <Typography variant="h6" component="div" gutterBottom>
                         Upload PDF
@@ -696,9 +761,8 @@ const StudyCompanion = () => {
                   <Button
                     variant="contained"
                     color="primary"
-                    size="large"
                     onClick={analyzeContent}
-                    disabled={loading || !uploadedFile}
+                    disabled={!uploadedFile || loading}
                     startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SummarizeIcon />}
                     sx={{ 
                       mt: 2, 
@@ -706,7 +770,13 @@ const StudyCompanion = () => {
                       px: 4,
                       py: 1.5,
                       textTransform: 'none',
-                      fontSize: '1rem'
+                      fontSize: '1rem',
+                      bgcolor: '#1565C0',
+                      boxShadow: '0 4px 12px rgba(21, 101, 192, 0.2)',
+                      '&:hover': {
+                        bgcolor: '#0D47A1',
+                        boxShadow: '0 6px 16px rgba(21, 101, 192, 0.3)'
+                      }
                     }}
                   >
                     {loading ? 'Analyzing...' : 'Analyze Content'}
@@ -718,8 +788,8 @@ const StudyCompanion = () => {
         </Box>
         
         {/* Summary Tab */}
-        <Box role="tabpanel" hidden={activeTab !== 1} id="tabpanel-1" aria-labelledby="tab-1">
-          {activeTab === 1 && (
+        <Box role="tabpanel" hidden={tabValue !== 1} id="tabpanel-1" aria-labelledby="tab-1">
+          {tabValue === 1 && summary && (
             <Box>
               {isAnalyzing ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
@@ -797,13 +867,19 @@ const StudyCompanion = () => {
                       variant="contained"
                       color="primary"
                       startIcon={<QuizIcon />}
-                      onClick={() => setActiveTab(2)}
+                      onClick={() => setTabValue(2)}
                       sx={{ 
                         borderRadius: '20px',
                         px: 4,
                         py: 1.5,
                         textTransform: 'none',
-                        fontSize: '1rem'
+                        fontSize: '1rem',
+                        bgcolor: '#1565C0',
+                        boxShadow: '0 4px 12px rgba(21, 101, 192, 0.2)',
+                        '&:hover': {
+                          bgcolor: '#0D47A1',
+                          boxShadow: '0 6px 16px rgba(21, 101, 192, 0.3)'
+                        }
                       }}
                     >
                       Take Quiz
@@ -812,13 +888,19 @@ const StudyCompanion = () => {
                       variant="contained"
                       color="primary"
                       startIcon={<CalendarMonthIcon />}
-                      onClick={() => setActiveTab(3)}
+                      onClick={() => setTabValue(3)}
                       sx={{ 
                         borderRadius: '20px',
                         px: 4,
                         py: 1.5,
                         textTransform: 'none',
-                        fontSize: '1rem'
+                        fontSize: '1rem',
+                        bgcolor: '#1565C0',
+                        boxShadow: '0 4px 12px rgba(21, 101, 192, 0.2)',
+                        '&:hover': {
+                          bgcolor: '#0D47A1',
+                          boxShadow: '0 6px 16px rgba(21, 101, 192, 0.3)'
+                        }
                       }}
                     >
                       Create Study Plan
@@ -831,8 +913,8 @@ const StudyCompanion = () => {
         </Box>
         
         {/* Quiz Tab */}
-        <Box role="tabpanel" hidden={activeTab !== 2} id="tabpanel-2" aria-labelledby="tab-2">
-          {activeTab === 2 && (
+        <Box role="tabpanel" hidden={tabValue !== 2} id="tabpanel-2" aria-labelledby="tab-2">
+          {tabValue === 2 && quiz.length > 0 && (
             <Box>
               {quiz.length === 0 ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
@@ -1008,8 +1090,8 @@ const StudyCompanion = () => {
         </Box>
         
         {/* Study Plan Tab */}
-        <Box role="tabpanel" hidden={activeTab !== 3} id="tabpanel-3" aria-labelledby="tab-3">
-          {activeTab === 3 && (
+        <Box role="tabpanel" hidden={tabValue !== 3} id="tabpanel-3" aria-labelledby="tab-3">
+          {tabValue === 3 && summary && (
             <Box>
               <StudyPlanGenerator 
                 content={extractedText} 

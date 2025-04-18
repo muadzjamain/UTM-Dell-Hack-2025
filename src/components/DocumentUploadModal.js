@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Dialog, 
   DialogTitle, 
@@ -9,48 +9,37 @@ import {
   Box, 
   IconButton,
   Paper,
-  Divider,
   CircularProgress,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
   Alert,
-  AlertTitle,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Avatar
+  Snackbar
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import ImageIcon from '@mui/icons-material/Image';
-import DescriptionIcon from '@mui/icons-material/Description';
-import ArticleIcon from '@mui/icons-material/Article';
+import { auth, storage, db } from '../firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
- * Document Upload Modal component that allows users to upload documents
- * @param {Object} props - Component props
- * @param {boolean} props.open - Whether the modal is open
- * @param {function} props.onClose - Function to call when closing the modal
+ * Document Upload Modal component for the Support page
+ * Allows users to upload documents for HR processing
  */
 const DocumentUploadModal = ({ open, onClose }) => {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
-  const [documentType, setDocumentType] = useState('');
-  const [description, setDescription] = useState('');
+  const [error, setError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
-  const dropAreaRef = useRef(null);
-
-  // Handle file selection from file input
+  
+  // Handle file selection
   const handleFileSelect = (event) => {
     if (event.target.files && event.target.files.length > 0) {
       const selectedFiles = Array.from(event.target.files);
@@ -58,34 +47,28 @@ const DocumentUploadModal = ({ open, onClose }) => {
     }
   };
   
-  // Handle drag enter event
-  const handleDragEnter = useCallback((e) => {
+  // Handle drag events
+  const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
-  }, []);
+  };
   
-  // Handle drag over event
-  const handleDragOver = useCallback((e) => {
+  const handleDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isDragging) {
       setIsDragging(true);
     }
-  }, [isDragging]);
+  };
   
-  // Handle drag leave event
-  const handleDragLeave = useCallback((e) => {
+  const handleDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only set isDragging to false if we're leaving the drop area (not a child element)
-    if (e.currentTarget === dropAreaRef.current) {
-      setIsDragging(false);
-    }
-  }, []);
+    setIsDragging(false);
+  };
   
-  // Handle drop event
-  const handleDrop = useCallback((e) => {
+  const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -94,38 +77,96 @@ const DocumentUploadModal = ({ open, onClose }) => {
       const droppedFiles = Array.from(e.dataTransfer.files);
       setFiles(prevFiles => [...prevFiles, ...droppedFiles]);
     }
-  }, []);
-
+  };
+  
   // Handle file removal
-  const handleFileRemove = (index) => {
+  const handleRemoveFile = (index) => {
     setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   };
-
-  // Handle document type change
-  const handleDocumentTypeChange = (event) => {
-    setDocumentType(event.target.value);
-  };
-
-  // Handle description change
-  const handleDescriptionChange = (event) => {
-    setDescription(event.target.value);
-  };
-
-  // Get icon based on file type
-  const getFileIcon = (file) => {
-    const extension = file.name.split('.').pop().toLowerCase();
+  
+  // Handle file upload
+  const handleUpload = async () => {
+    if (files.length === 0) {
+      setError("Please select at least one file to upload.");
+      return;
+    }
     
-    if (['pdf'].includes(extension)) {
-      return <PictureAsPdfIcon color="error" />;
-    } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(extension)) {
-      return <ImageIcon color="primary" />;
-    } else if (['doc', 'docx'].includes(extension)) {
-      return <DescriptionIcon color="primary" />;
-    } else {
-      return <InsertDriveFileIcon color="action" />;
+    setUploading(true);
+    setUploadProgress(0);
+    setError(null);
+    
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
+      // Upload each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const storageRef = ref(storage, `support-documents/${user.uid}/${file.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        
+        // Wait for upload to complete
+        await new Promise((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(progress);
+            },
+            (error) => {
+              reject(error);
+            },
+            async () => {
+              try {
+                // Get download URL
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                
+                // Save document metadata to Firestore
+                await addDoc(collection(db, 'support-documents'), {
+                  fileName: file.name,
+                  fileSize: file.size,
+                  fileType: file.type,
+                  downloadURL,
+                  userId: user.uid,
+                  uploadedAt: serverTimestamp(),
+                  status: 'pending' // pending, reviewed, approved, rejected
+                });
+                
+                resolve();
+              } catch (error) {
+                reject(error);
+              }
+            }
+          );
+        });
+        
+        // Update progress for multiple files
+        setUploadProgress(((i + 1) / files.length) * 100);
+      }
+      
+      setUploadComplete(true);
+      setFiles([]);
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      setError(error.message || "Failed to upload files. Please try again.");
+    } finally {
+      setUploading(false);
     }
   };
-
+  
+  // Handle modal close
+  const handleClose = () => {
+    if (!uploading) {
+      setFiles([]);
+      setUploadProgress(0);
+      setUploadComplete(false);
+      setError(null);
+      onClose();
+    }
+  };
+  
   // Format file size
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
@@ -134,139 +175,54 @@ const DocumentUploadModal = ({ open, onClose }) => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
-
-  // Handle upload
-  const handleUpload = () => {
-    if (files.length === 0) return;
-    
-    setUploading(true);
-    
-    // Simulate upload process
-    setTimeout(() => {
-      setUploading(false);
-      setUploadComplete(true);
-    }, 2000);
-  };
-
-  // Handle modal close
-  const handleClose = () => {
-    // Reset state if modal is closed
-    if (!uploading) {
-      setFiles([]);
-      setUploadComplete(false);
-      setDocumentType('');
-      setDescription('');
-      setIsDragging(false);
-      onClose();
-    }
-  };
-
+  
   return (
-    <Dialog 
-      open={open} 
-      onClose={handleClose}
-      maxWidth="md"
-      fullWidth
-      className="modal-enter"
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-          overflow: 'hidden'
-        }
-      }}
-    >
-      {/* Header */}
-      <DialogTitle 
-        sx={{ 
-          bgcolor: 'primary.main', 
-          color: 'white',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          p: 2
-        }}
+    <>
+      <Dialog 
+        open={open} 
+        onClose={handleClose}
+        maxWidth="md"
+        fullWidth
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Avatar sx={{ bgcolor: 'primary.light' }}>
-            <CloudUploadIcon />
-          </Avatar>
-          <Typography variant="h6">Document Upload</Typography>
-        </Box>
-        <IconButton 
-          edge="end" 
-          color="inherit" 
-          onClick={handleClose} 
-          aria-label="close"
-          disabled={uploading}
-        >
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-      
-      <DialogContent sx={{ p: 3 }}>
-        {uploadComplete ? (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <CheckCircleIcon sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
-            <Typography variant="h5" gutterBottom>Upload Complete!</Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              Your document{files.length > 1 ? 's have' : ' has'} been successfully uploaded and sent to Dell's HR/manager for review.
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              You will be notified once the document{files.length > 1 ? 's are' : ' is'} reviewed.
-            </Typography>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              sx={{ mt: 3 }}
-              onClick={handleClose}
-            >
-              Close
-            </Button>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Upload Documents</Typography>
+            <IconButton onClick={handleClose} disabled={uploading}>
+              <CloseIcon />
+            </IconButton>
           </Box>
-        ) : (
-          <>
-            {/* Document Type Selection */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel id="document-type-label">Document Type</InputLabel>
-              <Select
-                labelId="document-type-label"
-                id="document-type"
-                value={documentType}
-                label="Document Type"
-                onChange={handleDocumentTypeChange}
-                disabled={uploading}
+        </DialogTitle>
+        
+        <DialogContent>
+          {uploadComplete ? (
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              <CheckCircleIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                Upload Complete!
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                Your documents have been successfully uploaded and will be processed by HR.
+              </Typography>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                onClick={handleClose}
+                sx={{ mt: 3 }}
               >
-                <MenuItem value="certification">Certification</MenuItem>
-                <MenuItem value="training">Training Completion</MenuItem>
-                <MenuItem value="identification">Identification Document</MenuItem>
-                <MenuItem value="tax">Tax Document</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </Select>
-            </FormControl>
-            
-            {/* Description */}
-            <TextField
-              fullWidth
-              label="Description"
-              multiline
-              rows={2}
-              value={description}
-              onChange={handleDescriptionChange}
-              sx={{ mb: 3 }}
-              disabled={uploading}
-            />
-            
-            {/* File Upload Area */}
-            {files.length === 0 ? (
+                Close
+              </Button>
+            </Box>
+          ) : (
+            <>
+              {/* File Drop Area */}
               <Paper
-                ref={dropAreaRef}
                 variant="outlined"
                 sx={{
-                  p: 5,
+                  p: 3,
                   textAlign: 'center',
                   borderStyle: 'dashed',
                   borderWidth: 2,
-                  borderColor: isDragging ? 'primary.main' : 'primary.light',
+                  borderColor: isDragging ? 'primary.main' : 'grey.400',
                   bgcolor: isDragging ? 'primary.50' : 'background.paper',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
@@ -287,15 +243,14 @@ const DocumentUploadModal = ({ open, onClose }) => {
                   ref={fileInputRef}
                   style={{ display: 'none' }}
                   onChange={handleFileSelect}
-                  disabled={uploading}
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                 />
+                
                 <CloudUploadIcon 
                   sx={{ 
                     fontSize: 48, 
                     color: isDragging ? 'primary.dark' : 'primary.main', 
-                    mb: 2,
-                    transform: isDragging ? 'scale(1.2)' : 'scale(1)',
-                    transition: 'all 0.2s ease'
+                    mb: 2 
                   }} 
                 />
                 <Typography variant="h6" gutterBottom>
@@ -305,92 +260,94 @@ const DocumentUploadModal = ({ open, onClose }) => {
                   or click to browse files
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                  Supported formats: PDF, Word, Excel, Images
+                  Supported formats: PDF, Word, Images
                 </Typography>
               </Paper>
-            ) : (
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle1">Selected Files</Typography>
-                  <Button 
-                    size="small" 
-                    startIcon={<CloudUploadIcon />}
-                    onClick={() => fileInputRef.current.click()}
-                    disabled={uploading}
-                  >
-                    Add More
-                  </Button>
-                  <input
-                    type="file"
-                    multiple
-                    ref={fileInputRef}
-                    style={{ display: 'none' }}
-                    onChange={handleFileSelect}
-                    disabled={uploading}
-                  />
-                </Box>
-                
-                <Paper variant="outlined" sx={{ mb: 3 }}>
-                  <List sx={{ p: 0 }}>
+              
+              {/* File List */}
+              {files.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Selected Files ({files.length})
+                  </Typography>
+                  <List>
                     {files.map((file, index) => (
-                      <React.Fragment key={index}>
-                        <ListItem
-                          secondaryAction={
-                            <IconButton 
-                              edge="end" 
-                              aria-label="delete" 
-                              onClick={() => handleFileRemove(index)}
-                              disabled={uploading}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          }
-                        >
-                          <ListItemIcon>
-                            {getFileIcon(file)}
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary={file.name} 
-                            secondary={formatFileSize(file.size)} 
-                          />
-                        </ListItem>
-                        {index < files.length - 1 && <Divider />}
-                      </React.Fragment>
+                      <ListItem 
+                        key={`${file.name}-${index}`}
+                        secondaryAction={
+                          <IconButton 
+                            edge="end" 
+                            onClick={() => handleRemoveFile(index)}
+                            disabled={uploading}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        }
+                      >
+                        <ListItemIcon>
+                          <InsertDriveFileIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary={file.name} 
+                          secondary={formatFileSize(file.size)} 
+                        />
+                      </ListItem>
                     ))}
                   </List>
-                </Paper>
-                
-                <Alert severity="info" sx={{ mb: 3 }}>
-                  <AlertTitle>Note</AlertTitle>
-                  Files will be uploaded securely and will only be accessible to authorized Dell personnel.
+                </Box>
+              )}
+              
+              {/* Upload Progress */}
+              {uploading && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Uploading... {Math.round(uploadProgress)}%
+                  </Typography>
+                  <Box sx={{ width: '100%', mt: 1 }}>
+                    <CircularProgress 
+                      variant="determinate" 
+                      value={uploadProgress} 
+                      size={40}
+                      thickness={4}
+                      sx={{ display: 'block', mx: 'auto' }}
+                    />
+                  </Box>
+                </Box>
+              )}
+              
+              {/* Error Message */}
+              {error && (
+                <Alert severity="error" sx={{ mt: 3 }}>
+                  {error}
                 </Alert>
-              </Box>
-            )}
-          </>
+              )}
+            </>
+          )}
+        </DialogContent>
+        
+        {!uploadComplete && !uploading && (
+          <DialogActions>
+            <Button onClick={handleClose}>Cancel</Button>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handleUpload}
+              disabled={files.length === 0 || uploading}
+            >
+              Upload
+            </Button>
+          </DialogActions>
         )}
-      </DialogContent>
+      </Dialog>
       
-      {!uploadComplete && (
-        <DialogActions sx={{ p: 2, bgcolor: 'background.paper' }}>
-          <Button 
-            onClick={handleClose} 
-            color="inherit"
-            disabled={uploading}
-          >
-            Cancel
-          </Button>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
-            onClick={handleUpload}
-            disabled={files.length === 0 || uploading || !documentType}
-          >
-            {uploading ? 'Uploading...' : 'Upload Files'}
-          </Button>
-        </DialogActions>
-      )}
-    </Dialog>
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={Boolean(error)}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        message={error}
+      />
+    </>
   );
 };
 

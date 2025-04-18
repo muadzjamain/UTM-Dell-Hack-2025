@@ -127,7 +127,7 @@ const Home = () => {
                   gutterBottom
                   sx={{ fontWeight: 'medium', mb: 2 }}
                 >
-                  Study Companion
+                  Training
                 </Typography>
                 <Typography 
                   color="text.secondary" 

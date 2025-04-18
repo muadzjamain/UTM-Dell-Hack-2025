@@ -660,7 +660,7 @@ const Dashboard = () => {
                     variant="outlined" 
                     startIcon={<SchoolIcon />} 
                     sx={{ justifyContent: 'flex-start', borderRadius: 2 }}
-                    onClick={() => navigate('/training')}
+                    onClick={() => navigate('/study-companion')}
                   >
                     Learning Portal
                   </Button>

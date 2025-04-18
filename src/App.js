@@ -8,13 +8,13 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import Training from './pages/Training';
 import CultureCompliance from './pages/CultureCompliance';
 import PerformanceFeedback from './pages/PerformanceFeedback';
 import Support from './pages/Support';
 import FinalReview from './pages/FinalReview';
 import Profile from './pages/Profile';
 import PersonalizedGoals from './pages/PersonalizedGoals';
+import StudyCompanion from './pages/StudyCompanion';
 import theme from './theme/theme';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
@@ -54,12 +54,12 @@ function App() {
           
           {/* Protected Routes - Redirect to login if not authenticated */}
           <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-          <Route path="/training" element={user ? <Training /> : <Navigate to="/login" />} />
           <Route path="/culture-compliance" element={user ? <CultureCompliance /> : <Navigate to="/login" />} />
           <Route path="/performance-feedback" element={user ? <PerformanceFeedback /> : <Navigate to="/login" />} />
           <Route path="/final-review" element={user ? <FinalReview /> : <Navigate to="/login" />} />
           <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
           <Route path="/goals" element={user ? <PersonalizedGoals /> : <Navigate to="/login" />} />
+          <Route path="/study-companion" element={user ? <StudyCompanion /> : <Navigate to="/login" />} />
         </Routes>
       </Router>
     </ThemeProvider>

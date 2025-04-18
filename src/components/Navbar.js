@@ -25,6 +25,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SchoolIcon from '@mui/icons-material/School';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BusinessIcon from '@mui/icons-material/Business';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import HelpIcon from '@mui/icons-material/Help';
@@ -110,8 +111,8 @@ const Navbar = ({ user }) => {
   // Define navigation based on user role
   const employeePages = [
     { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
-    { name: 'Training', path: '/training', icon: <SchoolIcon /> },
     { name: 'Culture Rules', path: '/culture-compliance', icon: <BusinessIcon /> },
+    { name: 'Training', path: '/study-companion', icon: <MenuBookIcon /> },
     { name: 'Personalized Goals', path: '/goals', icon: <FlagIcon /> },
     { name: 'Performance', path: '/performance-feedback', icon: <AssessmentIcon /> },
     { name: 'Support', path: '/support', icon: <HelpIcon /> },
