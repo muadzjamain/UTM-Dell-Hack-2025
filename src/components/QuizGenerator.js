@@ -22,6 +22,9 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import QuizIcon from '@mui/icons-material/Quiz';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import ImageIcon from '@mui/icons-material/Image';
 import { generateQuiz } from '../services/geminiService';
 
 const QuizGenerator = ({ documentContent, documentTitle, documentType }) => {
@@ -122,22 +125,101 @@ ${documentContent}`;
         </Typography>
         
         {documentTitle && (
-          <Typography variant="subtitle1" sx={{ mb: 2 }}>
-            Document: <strong>{documentTitle}</strong>
-          </Typography>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            p: 2, 
+            borderRadius: 2, 
+            bgcolor: 'rgba(0, 118, 206, 0.08)', 
+            mb: 2,
+            border: '1px solid rgba(0, 118, 206, 0.2)'
+          }}>
+            {documentType === 'pdf' ? (
+              <Box 
+                component="img" 
+                src="/pdf-icon.png" 
+                alt="PDF" 
+                sx={{ width: 36, height: 36, mr: 2 }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = '';
+                  e.target.style.display = 'none';
+                }}
+              />
+            ) : documentType === 'image' ? (
+              <ImageIcon sx={{ color: 'primary.main', fontSize: 36, mr: 2 }} />
+            ) : (
+              <PictureAsPdfIcon sx={{ color: 'primary.main', fontSize: 36, mr: 2 }} />
+            )}
+            <Box>
+              <Typography variant="subtitle1" fontWeight="bold">
+                {documentTitle}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Ready to generate quiz based on this document
+              </Typography>
+            </Box>
+          </Box>
         )}
         
         {!quiz && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleGenerateQuiz}
-            disabled={loading || !documentContent}
-            startIcon={loading && <CircularProgress size={20} color="inherit" />}
-            sx={{ mt: 1 }}
-          >
-            {loading ? 'Generating Quiz...' : 'Generate Quiz'}
-          </Button>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'center',
+            mt: 3,
+            position: 'relative'
+          }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleGenerateQuiz}
+              disabled={loading || !documentContent}
+              sx={{ 
+                py: 1.5, 
+                px: 4, 
+                borderRadius: 8,
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                background: 'linear-gradient(45deg, #0076CE 30%, #0092E0 90%)',
+                boxShadow: '0 8px 16px rgba(0, 118, 206, 0.3)',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 10px 20px rgba(0, 118, 206, 0.4)',
+                },
+                '&:active': {
+                  transform: 'translateY(1px)',
+                  boxShadow: '0 5px 10px rgba(0, 118, 206, 0.4)',
+                },
+                minWidth: 200
+              }}
+            >
+              {loading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CircularProgress size={24} color="inherit" sx={{ mr: 1.5 }} />
+                  <Typography>Generating Quiz...</Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <QuizIcon sx={{ mr: 1.5, fontSize: 28 }} />
+                  <Typography>Generate Quiz</Typography>
+                </Box>
+              )}
+            </Button>
+            {documentContent && !loading && (
+              <Box sx={{ 
+                position: 'absolute', 
+                bottom: -30, 
+                width: '100%', 
+                textAlign: 'center',
+                color: 'text.secondary',
+                fontSize: '0.85rem',
+                fontStyle: 'italic'
+              }}>
+                Click to create a quiz based on this document
+              </Box>
+            )}
+          </Box>
         )}
         
         {error && (

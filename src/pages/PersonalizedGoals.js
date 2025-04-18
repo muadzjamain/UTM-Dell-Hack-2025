@@ -22,7 +22,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Alert
+  Alert,
+  Slider
 } from '@mui/material';
 import FlagIcon from '@mui/icons-material/Flag';
 import AddIcon from '@mui/icons-material/Add';
@@ -400,6 +401,12 @@ const PersonalizedGoals = () => {
                   InputLabelProps={{
                     shrink: true,
                   }}
+                  // Fix for date picker error
+                  InputProps={{
+                    inputProps: {
+                      min: new Date().toISOString().split('T')[0] // Set min date to today
+                    }
+                  }}
                 />
                 
                 <FormControl fullWidth margin="normal">
@@ -415,15 +422,60 @@ const PersonalizedGoals = () => {
                   </Select>
                 </FormControl>
                 
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ mt: 3 }}>
                   <Typography variant="body2" gutterBottom>
                     Progress: {currentGoal.progress}%
                   </Typography>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={currentGoal.progress} 
-                    sx={{ height: 10, borderRadius: 5 }}
+                  
+                  {/* Draggable progress slider */}
+                  <Slider
+                    value={currentGoal.progress}
+                    onChange={(e, newValue) => setCurrentGoal({...currentGoal, progress: newValue})}
+                    aria-labelledby="progress-slider"
+                    valueLabelDisplay="auto"
+                    step={5}
+                    marks={[
+                      { value: 0, label: '0%' },
+                      { value: 25, label: '25%' },
+                      { value: 50, label: '50%' },
+                      { value: 75, label: '75%' },
+                      { value: 100, label: '100%' }
+                    ]}
+                    min={0}
+                    max={100}
+                    sx={{
+                      '& .MuiSlider-thumb': {
+                        height: 24,
+                        width: 24,
+                        backgroundColor: '#fff',
+                        border: '2px solid currentColor',
+                        '&:focus, &:hover, &.Mui-active, &.Mui-focusVisible': {
+                          boxShadow: '0 0 0 8px rgba(0, 118, 206, 0.16)',
+                        },
+                      },
+                      '& .MuiSlider-track': {
+                        height: 10,
+                        borderRadius: 5,
+                      },
+                      '& .MuiSlider-rail': {
+                        height: 10,
+                        borderRadius: 5,
+                        opacity: 0.5,
+                      },
+                      '& .MuiSlider-mark': {
+                        backgroundColor: '#bfbfbf',
+                        height: 8,
+                        width: 8,
+                        borderRadius: '50%',
+                      },
+                      '& .MuiSlider-markActive': {
+                        opacity: 1,
+                        backgroundColor: 'currentColor',
+                      },
+                    }}
                   />
+                  
+                  {/* Quick selection buttons */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
                     {[0, 25, 50, 75, 100].map((value) => (
                       <Button 
@@ -431,6 +483,10 @@ const PersonalizedGoals = () => {
                         size="small" 
                         variant={currentGoal.progress === value ? "contained" : "outlined"}
                         onClick={() => setCurrentGoal({...currentGoal, progress: value})}
+                        sx={{
+                          minWidth: '60px',
+                          borderRadius: '20px',
+                        }}
                       >
                         {value}%
                       </Button>

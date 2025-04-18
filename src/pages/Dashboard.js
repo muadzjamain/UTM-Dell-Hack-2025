@@ -32,6 +32,7 @@ import Draggable from 'react-draggable';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getDellAssistantResponse } from '../services/geminiService';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -48,6 +49,15 @@ const Dashboard = () => {
     { sender: 'bot', text: "Hi there! I'm your Dell onboarding assistant. How can I help you today?" }
   ]);
   const [userInput, setUserInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const chatEndRef = useRef(null);
+  
+  // Scroll to bottom of chat when messages change
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
   
   // Fetch user data on component mount
   useEffect(() => {
@@ -222,35 +232,63 @@ const Dashboard = () => {
   const fullName = `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim();
   
   // Handle sending a message in the chat
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (userInput.trim() === '') return;
     
+    // Store the current input before clearing it
+    const currentInput = userInput;
+    
     // Add user message to chat
-    setChatMessages(prev => [...prev, { sender: 'user', text: userInput }]);
+    setChatMessages(prev => [...prev, { sender: 'user', text: currentInput }]);
     
-    // Process the message (in a real app, this would call an AI service)
-    setTimeout(() => {
-      let botResponse = "I'm here to help with your onboarding process. What specific information are you looking for?";
-      
-      // Simple keyword-based responses
-      const input = userInput.toLowerCase();
-      if (input.includes('hello') || input.includes('hi')) {
-        botResponse = "Hello! How can I assist with your onboarding today?";
-      } else if (input.includes('training') || input.includes('learn')) {
-        botResponse = "You can access all your training modules in the Learning Portal. Would you like me to direct you there?";
-      } else if (input.includes('password') || input.includes('login')) {
-        botResponse = "For password or login issues, please contact the IT helpdesk at helpdesk@dell.com or visit the Support page.";
-      } else if (input.includes('policy') || input.includes('security')) {
-        botResponse = "Dell's security policies can be found in the Security Policies section. Would you like me to show you where?";
-      } else if (input.includes('thank')) {
-        botResponse = "You're welcome! Feel free to ask if you need anything else.";
-      }
-      
-      setChatMessages(prev => [...prev, { sender: 'bot', text: botResponse }]);
-    }, 1000);
-    
-    // Clear input field
+    // Clear input field immediately for better UX
     setUserInput('');
+    
+    // Show typing indicator
+    setIsTyping(true);
+    
+    try {
+      // Get response from Gemini AI
+      const response = await getDellAssistantResponse(
+        currentInput, 
+        chatMessages, // Pass all messages for context
+        userProfile // Pass user profile for personalization
+      );
+      
+      // Add a slight delay to simulate natural typing
+      setTimeout(() => {
+        // Add the response to chat
+        setChatMessages(prev => [...prev, { sender: 'bot', text: response }]);
+        // Hide typing indicator
+        setIsTyping(false);
+      }, 500 + Math.random() * 1000); // Random delay between 500-1500ms for natural feel
+      
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      
+      // Add a slight delay before showing the error message
+      setTimeout(() => {
+        // Add error message to chat
+        setChatMessages(prev => [...prev, { 
+          sender: 'bot', 
+          text: "I'm experiencing some technical difficulties. Please try again or contact the IT helpdesk if you need immediate assistance.",
+          isError: true
+        }]);
+        // Hide typing indicator
+        setIsTyping(false);
+      }, 500);
+    }
+  };
+  
+  // Format message text with line breaks
+  const formatMessageText = (text) => {
+    if (!text) return '';
+    return text.split('\n').map((line, i) => (
+      <React.Fragment key={i}>
+        {line}
+        {i < text.split('\n').length - 1 && <br />}
+      </React.Fragment>
+    ));
   };
   
   // Handle key press in chat input (send on Enter)
@@ -656,12 +694,17 @@ const Dashboard = () => {
             transition: 'all 0.3s ease',
             width: isChatOpen ? 350 : 60,
             height: isChatOpen ? 500 : 60,
-            borderRadius: isChatOpen ? 2 : '50%',
+            borderRadius: isChatOpen ? 10 : '50%',
             bgcolor: 'primary.main',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
             overflow: 'hidden',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            transform: 'scale(1)',
+            '&:hover': {
+              transform: isChatOpen ? 'scale(1)' : 'scale(1.05)',
+              boxShadow: isChatOpen ? '0 8px 32px rgba(0,0,0,0.2)' : '0 8px 32px rgba(0,0,0,0.3)'
+            }
           }}
         >
           {/* Chat Header - Draggable Area */}
@@ -674,21 +717,40 @@ const Dashboard = () => {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              cursor: 'move'
+              cursor: 'move',
+              borderTopLeftRadius: isChatOpen ? 8 : 30,
+              borderTopRightRadius: isChatOpen ? 8 : 30,
+              borderBottomLeftRadius: !isChatOpen ? 30 : 0,
+              borderBottomRightRadius: !isChatOpen ? 30 : 0,
+              transition: 'all 0.3s ease'
             }}
           >
             {isChatOpen ? (
               <>
-                <Typography variant="subtitle1" fontWeight="bold">
-                  AI Onboarding Assistant
-                </Typography>
-                <IconButton 
-                  size="small" 
-                  onClick={() => setIsChatOpen(false)}
-                  sx={{ color: 'white' }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Avatar 
+                    sx={{ 
+                      bgcolor: 'primary.light', 
+                      width: 32, 
+                      height: 32,
+                      boxShadow: '0 0 0 2px rgba(255,255,255,0.2)'
+                    }}
+                  >
+                    <SmartToyIcon fontSize="small" />
+                  </Avatar>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Dell Assistant
+                  </Typography>
+                </Box>
+                <Box>
+                  <IconButton 
+                    size="small" 
+                    onClick={() => setIsChatOpen(false)}
+                    sx={{ color: 'white' }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Box>
               </>
             ) : (
               <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -720,12 +782,73 @@ const Dashboard = () => {
                       borderRadius: 2,
                       bgcolor: msg.sender === 'user' ? 'primary.main' : 'white',
                       color: msg.sender === 'user' ? 'white' : 'text.primary',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      position: 'relative',
+                      '&::before': msg.sender === 'bot' ? {
+                        content: '""',
+                        position: 'absolute',
+                        left: -8,
+                        top: 10,
+                        borderWidth: 8,
+                        borderStyle: 'solid',
+                        borderColor: 'transparent white transparent transparent',
+                      } : msg.sender === 'user' ? {
+                        content: '""',
+                        position: 'absolute',
+                        right: -8,
+                        top: 10,
+                        borderWidth: 8,
+                        borderStyle: 'solid',
+                        borderColor: 'transparent transparent transparent primary.main',
+                      } : {}
                     }}
                   >
-                    <Typography variant="body2">{msg.text}</Typography>
+                    {msg.sender === 'bot' && (
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          display: 'block', 
+                          fontWeight: 'bold',
+                          mb: 0.5,
+                          color: 'primary.main'
+                        }}
+                      >
+                        Dell Assistant
+                      </Typography>
+                    )}
+                    <Typography variant="body2">
+                      {formatMessageText(msg.text)}
+                    </Typography>
                   </Box>
                 ))}
+                
+                {/* Typing indicator */}
+                {isTyping && (
+                  <Box
+                    sx={{
+                      alignSelf: 'flex-start',
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: 'white',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                      Dell Assistant
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box sx={{ width: 6, height: 6, bgcolor: 'primary.main', borderRadius: '50%', animation: 'pulse 1s infinite' }} />
+                      <Box sx={{ width: 6, height: 6, bgcolor: 'primary.main', borderRadius: '50%', animation: 'pulse 1s infinite 0.2s' }} />
+                      <Box sx={{ width: 6, height: 6, bgcolor: 'primary.main', borderRadius: '50%', animation: 'pulse 1s infinite 0.4s' }} />
+                    </Box>
+                  </Box>
+                )}
+                
+                {/* Invisible element to scroll to */}
+                <div ref={chatEndRef} />
               </Box>
               
               {/* Input Area */}
@@ -735,26 +858,71 @@ const Dashboard = () => {
                 borderTop: '1px solid',
                 borderColor: 'divider',
                 display: 'flex',
-                alignItems: 'center',
+                flexDirection: 'column',
                 gap: 1
               }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Type your question..."
-                  variant="outlined"
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  sx={{ '& fieldset': { borderRadius: 4 } }}
-                />
-                <IconButton 
-                  color="primary" 
-                  onClick={handleSendMessage}
-                  disabled={!userInput.trim()}
-                >
-                  <SendIcon />
-                </IconButton>
+                {/* Suggestion chips */}
+                {chatMessages.length < 3 && (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                    {[
+                      "How do I access my training?",
+                      "What benefits do I have?",
+                      "Who is my manager?",
+                      "IT support contact?"
+                    ].map((suggestion, index) => (
+                      <Chip
+                        key={index}
+                        label={suggestion}
+                        size="small"
+                        onClick={() => {
+                          setUserInput(suggestion);
+                          setTimeout(() => handleSendMessage(), 100);
+                        }}
+                        sx={{
+                          cursor: 'pointer',
+                          '&:hover': { bgcolor: 'primary.light', color: 'white' }
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Type your question..."
+                    variant="outlined"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    disabled={isTyping}
+                    sx={{ 
+                      '& fieldset': { borderRadius: 4 },
+                      '& .MuiOutlinedInput-root': {
+                        '&.Mui-focused fieldset': {
+                          borderColor: 'primary.main',
+                          borderWidth: 2
+                        }
+                      }
+                    }}
+                  />
+                  <IconButton 
+                    color="primary" 
+                    onClick={handleSendMessage}
+                    disabled={!userInput.trim() || isTyping}
+                    sx={{
+                      bgcolor: userInput.trim() && !isTyping ? 'primary.main' : 'grey.200',
+                      color: userInput.trim() && !isTyping ? 'white' : 'grey.500',
+                      '&:hover': {
+                        bgcolor: userInput.trim() && !isTyping ? 'primary.dark' : 'grey.200',
+                      },
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <SendIcon />
+                  </IconButton>
+                </Box>
               </Box>
             </>
           )}

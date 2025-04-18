@@ -93,7 +93,30 @@ const LandingPage = () => {
           zIndex: 1
         }}
       >
-    
+        <Typography 
+          variant="h4" 
+          component="div" 
+          sx={{ 
+            fontWeight: 'bold',
+            color: '#0076CE',
+            letterSpacing: '-0.5px'
+          }}
+        >
+          Deltri
+        </Typography>
+        <Button 
+          variant="outlined" 
+          color="primary"
+          onClick={() => navigate('/login')}
+          sx={{
+            borderRadius: 8,
+            px: 3,
+            textTransform: 'none',
+            fontWeight: 500
+          }}
+        >
+          Sign In
+        </Button>
       </Box>
 
       {/* Main content */}
@@ -175,28 +198,41 @@ const LandingPage = () => {
                   alignItems: 'center'
                 }}
               >
-                <Box
+                <Paper
+                  elevation={8}
                   sx={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    position: 'relative'
+                    width: '80%',
+                    height: '80%',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    position: 'relative',
+                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+                    background: '#fff'
                   }}
                 >
-                  <img
-                    src={process.env.PUBLIC_URL + '/images/Boarding page image.png'}
+                  <Box
+                    component="img"
+                    src="Deltri/src/images/Boarding page image.png"
                     alt="Dell Onboarding"
-                    style={{
-                      maxWidth: '90%',
-                      maxHeight: '90%',
-                      objectFit: 'contain',
-                      borderRadius: '16px',
-                      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center',
+                      opacity: 0.9
+                    }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = '';
+                      e.target.style.display = 'flex';
+                      e.target.style.alignItems = 'center';
+                      e.target.style.justifyContent = 'center';
+                      e.target.style.backgroundColor = '#f0f4f8';
+                      e.target.style.color = '#0076CE';
+                      e.target.innerHTML = '<div style="text-align: center; padding: 20px;"><svg width="80" height="80" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72L5.18 9L12 5.28L18.82 9zM17 15.99l-5 2.73l-5-2.73v-3.72L12 15l5-2.73v3.72z"/></svg><p style="margin-top: 10px; font-weight: bold;">Dell Technologies</p></div>';
                     }}
                   />
-                </Box>
+                </Paper>
                 
                 {/* Floating elements */}
                 <Avatar
