@@ -24,7 +24,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { generateQuiz } from '../services/geminiService';
 
-const QuizGenerator = ({ documentContent, documentTitle }) => {
+const QuizGenerator = ({ documentContent, documentTitle, documentType }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [quiz, setQuiz] = useState(null);
@@ -46,9 +46,21 @@ const QuizGenerator = ({ documentContent, documentTitle }) => {
       setUserAnswers({});
       setSubmitted(false);
       setScore(null);
+      
+      // Add context about the document type to help the AI generate better questions
+      // Extract the actual document title without file extension
+      const cleanTitle = documentTitle.replace(/\.[^/.]+$/, '');
+      
+      // Create a more focused context for the document
+      const contextualizedContent = `${cleanTitle}
 
+Document Type: ${documentType || 'text'}
+
+Document Content:
+${documentContent}`;
+      
       // Generate quiz questions using Gemini API
-      const quizQuestions = await generateQuiz(documentContent);
+      const quizQuestions = await generateQuiz(contextualizedContent);
       
       setQuiz(quizQuestions);
     } catch (err) {

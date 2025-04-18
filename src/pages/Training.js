@@ -18,15 +18,18 @@ import {
   Paper,
   Chip,
   Alert,
-  CircularProgress
+  CircularProgress,
+  ImageList,
+  ImageListItem
 } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import ImageIcon from '@mui/icons-material/Image';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import FlagIcon from '@mui/icons-material/Flag';
 import QuizIcon from '@mui/icons-material/Quiz';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import PDFUploader from '../components/PDFUploader';
+import MediaUploader from '../components/MediaUploader';
 import QuizGenerator from '../components/QuizGenerator';
 import ChatAssistant from '../components/ChatAssistant';
 import { auth, db } from '../firebase';
@@ -40,6 +43,7 @@ const Training = () => {
   const [error, setError] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [activeTab, setActiveTab] = useState(0);
   
   // Fetch user data and documents on component mount
   useEffect(() => {
@@ -91,8 +95,13 @@ const Training = () => {
   };
   
   // Handle document upload completion
-  const handleUploadComplete = (documentData) => {
+  const handleUploadComplete = () => {
     loadDocumentsFromStorage(userId);
+  };
+  
+  // Handle tab change in the documents section
+  const handleDocumentTabChange = (event, newValue) => {
+    setActiveTab(newValue);
   };
   
   // Placeholder data for learning modules
@@ -284,7 +293,10 @@ const Training = () => {
                   <Typography variant="h5" gutterBottom>
                     Upload Training Materials
                   </Typography>
-                  <PDFUploader userId={userId} onUploadComplete={handleUploadComplete} />
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Upload training materials in PDF format, images, or capture using your camera
+                  </Typography>
+                  <MediaUploader userId={userId} onUploadComplete={handleUploadComplete} />
                 </Grid>
                 
                 <Grid item xs={12} md={6}>
@@ -293,41 +305,150 @@ const Training = () => {
                   </Typography>
                   <Paper sx={{ p: 3, borderRadius: 2 }}>
                     {uploadedDocuments.length > 0 ? (
-                      <List>
-                        {uploadedDocuments.map((doc) => (
-                          <React.Fragment key={doc.id}>
-                            <ListItem alignItems="flex-start">
-                              <ListItemIcon>
-                                <PictureAsPdfIcon color="error" />
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={doc.fileName}
-                                secondary={
-                                  <>
-                                    <Typography variant="body2" component="span" color="text.secondary">
-                                      Uploaded: {new Date(doc.uploadDate).toLocaleDateString()}
-                                    </Typography>
-                                    <Typography variant="body2" component="div" sx={{ mt: 1 }}>
-                                      <strong>Summary:</strong> {doc.summary}
-                                    </Typography>
-                                  </>
-                                }
-                              />
-                              <Button 
-                                variant="outlined" 
-                                color="primary"
-                                size="small"
-                                onClick={() => handleDocumentSelect(doc)}
-                                startIcon={<QuizIcon />}
-                                sx={{ mt: 1 }}
-                              >
-                                Generate Quiz
-                              </Button>
-                            </ListItem>
-                            <Divider component="li" />
-                          </React.Fragment>
-                        ))}
-                      </List>
+                      <Box>
+                        <Tabs 
+                          value={activeTab} 
+                          onChange={handleDocumentTabChange} 
+                          sx={{ mb: 2 }}
+                          variant="scrollable"
+                          scrollButtons="auto"
+                        >
+                          <Tab label="All" />
+                          <Tab label="PDFs" />
+                          <Tab label="Images" />
+                        </Tabs>
+                        
+                        {activeTab === 0 && (
+                          <List>
+                            {uploadedDocuments.map((doc, index) => (
+                              <React.Fragment key={`${doc.fileName}-${index}`}>
+                                <ListItem alignItems="flex-start">
+                                  <ListItemIcon>
+                                    {doc.fileType === 'pdf' ? 
+                                      <PictureAsPdfIcon color="error" /> : 
+                                      <ImageIcon color="primary" />}
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={doc.fileName}
+                                    secondary={
+                                      <>
+                                        <Typography variant="body2" component="span" color="text.secondary">
+                                          Uploaded: {new Date(doc.uploadDate).toLocaleDateString()}
+                                        </Typography>
+                                        {doc.summary && (
+                                          <Typography variant="body2" component="div" sx={{ mt: 1 }}>
+                                            <strong>Summary:</strong> {doc.summary}
+                                          </Typography>
+                                        )}
+                                        {doc.previewUrl && doc.fileType !== 'pdf' && (
+                                          <Box sx={{ mt: 1 }}>
+                                            <img 
+                                              src={doc.previewUrl} 
+                                              alt="Preview" 
+                                              style={{ 
+                                                width: 100, 
+                                                height: 100, 
+                                                objectFit: 'cover', 
+                                                borderRadius: 4 
+                                              }} 
+                                            />
+                                          </Box>
+                                        )}
+                                      </>
+                                    }
+                                  />
+                                  <Button 
+                                    variant="outlined" 
+                                    color="primary"
+                                    size="small"
+                                    onClick={() => handleDocumentSelect(doc)}
+                                    startIcon={<QuizIcon />}
+                                    sx={{ mt: 1 }}
+                                  >
+                                    Generate Quiz
+                                  </Button>
+                                </ListItem>
+                                <Divider component="li" />
+                              </React.Fragment>
+                            ))}
+                          </List>
+                        )}
+                        
+                        {activeTab === 1 && (
+                          <List>
+                            {uploadedDocuments
+                              .filter(doc => doc.fileType === 'pdf')
+                              .map((doc, index) => (
+                                <React.Fragment key={`pdf-${doc.fileName}-${index}`}>
+                                  <ListItem alignItems="flex-start">
+                                    <ListItemIcon>
+                                      <PictureAsPdfIcon color="error" />
+                                    </ListItemIcon>
+                                    <ListItemText
+                                      primary={doc.fileName}
+                                      secondary={
+                                        <>
+                                          <Typography variant="body2" component="span" color="text.secondary">
+                                            Uploaded: {new Date(doc.uploadDate).toLocaleDateString()}
+                                          </Typography>
+                                          {doc.summary && (
+                                            <Typography variant="body2" component="div" sx={{ mt: 1 }}>
+                                              <strong>Summary:</strong> {doc.summary}
+                                            </Typography>
+                                          )}
+                                        </>
+                                      }
+                                    />
+                                    <Button 
+                                      variant="outlined" 
+                                      color="primary"
+                                      size="small"
+                                      onClick={() => handleDocumentSelect(doc)}
+                                      startIcon={<QuizIcon />}
+                                      sx={{ mt: 1 }}
+                                    >
+                                      Generate Quiz
+                                    </Button>
+                                  </ListItem>
+                                  <Divider component="li" />
+                                </React.Fragment>
+                              ))}
+                          </List>
+                        )}
+                        
+                        {activeTab === 2 && (
+                          <Box>
+                            {uploadedDocuments.filter(doc => doc.fileType === 'image' || doc.fileType === 'camera').length > 0 ? (
+                              <ImageList cols={2} gap={8}>
+                                {uploadedDocuments
+                                  .filter(doc => doc.fileType === 'image' || doc.fileType === 'camera')
+                                  .map((doc, index) => (
+                                    <ImageListItem key={`img-${doc.fileName}-${index}`}>
+                                      <img
+                                        src={doc.previewUrl}
+                                        alt={doc.fileName}
+                                        style={{ borderRadius: 8, objectFit: 'cover', height: 200 }}
+                                        loading="lazy"
+                                      />
+                                      <Box sx={{ mt: 1 }}>
+                                        <Typography variant="body2" noWrap>
+                                          {doc.fileName}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {new Date(doc.uploadDate).toLocaleDateString()}
+                                        </Typography>
+                                      </Box>
+                                    </ImageListItem>
+                                  ))}
+                              </ImageList>
+                            ) : (
+                              <Typography variant="body1" color="text.secondary">
+                                No images uploaded yet.
+                              </Typography>
+                            )}
+                          </Box>
+                        )}
+                      </Box>
                     ) : (
                       <Typography variant="body1" color="text.secondary">
                         No documents uploaded yet. Upload your first document to get started.
@@ -362,8 +483,9 @@ const Training = () => {
                   </Box>
                   
                   <QuizGenerator 
-                    documentContent={selectedDocument.summary} 
+                    documentContent={selectedDocument.content || selectedDocument.summary} 
                     documentTitle={selectedDocument.fileName} 
+                    documentType={selectedDocument.fileType}
                   />
                 </>
               ) : (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Container, 
   Typography, 
@@ -13,7 +13,9 @@ import {
   Avatar,
   Paper,
   Stack,
-  CircularProgress
+  CircularProgress,
+  TextField,
+  IconButton
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -23,17 +25,29 @@ import SchoolIcon from '@mui/icons-material/School';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import CloseIcon from '@mui/icons-material/Close';
+import SendIcon from '@mui/icons-material/Send';
+import Draggable from 'react-draggable';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const nodeRef = useRef(null);
   
   // State for user profile data
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // State for chatbot widget
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    { sender: 'bot', text: "Hi there! I'm your Dell onboarding assistant. How can I help you today?" }
+  ]);
+  const [userInput, setUserInput] = useState('');
   
   // Fetch user data on component mount
   useEffect(() => {
@@ -134,12 +148,27 @@ const Dashboard = () => {
   
   // Calculate days since onboarding started
   const calculateDaysSinceStart = () => {
-    if (!userProfile?.startDate) return 0;
+    if (!userProfile?.startDate) return 1; // Default to 1 day if no start date
     
-    const startDate = new Date(userProfile.startDate);
-    const today = new Date();
-    const diffTime = Math.abs(today - startDate);
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    try {
+      const startDate = new Date(userProfile.startDate);
+      const today = new Date();
+      
+      // Check if startDate is valid
+      if (isNaN(startDate.getTime())) {
+        console.warn('Invalid start date:', userProfile.startDate);
+        return 1; // Default to 1 day if invalid date
+      }
+      
+      const diffTime = Math.abs(today - startDate);
+      const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Ensure we return at least 1 day
+      return Math.max(1, days);
+    } catch (error) {
+      console.error('Error calculating days since start:', error);
+      return 1; // Default to 1 day on error
+    }
   };
   
   const getStatusColor = (status) => {
@@ -192,6 +221,45 @@ const Dashboard = () => {
   // Get full name
   const fullName = `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim();
   
+  // Handle sending a message in the chat
+  const handleSendMessage = () => {
+    if (userInput.trim() === '') return;
+    
+    // Add user message to chat
+    setChatMessages(prev => [...prev, { sender: 'user', text: userInput }]);
+    
+    // Process the message (in a real app, this would call an AI service)
+    setTimeout(() => {
+      let botResponse = "I'm here to help with your onboarding process. What specific information are you looking for?";
+      
+      // Simple keyword-based responses
+      const input = userInput.toLowerCase();
+      if (input.includes('hello') || input.includes('hi')) {
+        botResponse = "Hello! How can I assist with your onboarding today?";
+      } else if (input.includes('training') || input.includes('learn')) {
+        botResponse = "You can access all your training modules in the Learning Portal. Would you like me to direct you there?";
+      } else if (input.includes('password') || input.includes('login')) {
+        botResponse = "For password or login issues, please contact the IT helpdesk at helpdesk@dell.com or visit the Support page.";
+      } else if (input.includes('policy') || input.includes('security')) {
+        botResponse = "Dell's security policies can be found in the Security Policies section. Would you like me to show you where?";
+      } else if (input.includes('thank')) {
+        botResponse = "You're welcome! Feel free to ask if you need anything else.";
+      }
+      
+      setChatMessages(prev => [...prev, { sender: 'bot', text: botResponse }]);
+    }, 1000);
+    
+    // Clear input field
+    setUserInput('');
+  };
+  
+  // Handle key press in chat input (send on Enter)
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSendMessage();
+    }
+  };
+
   return (
     <Box sx={{ minHeight: '100vh', pb: 6, backgroundColor: '#f5f8fa' }}>
       <Container maxWidth="lg" sx={{ pt: 4 }}>
@@ -218,6 +286,9 @@ const Dashboard = () => {
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: 2 }}>
                 You're on day {calculateDaysSinceStart()} of your onboarding journey. Keep up the great progress!
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
+                Onboarding Status: <strong>{userProfile.onboardingStatus || 'In Progress'}</strong>
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Chip 
@@ -267,6 +338,7 @@ const Dashboard = () => {
         
         {/* Main Content */}
         <Grid container spacing={3}>
+          
           <Grid item xs={12} md={8}>
             {/* Current Task Card */}
             <Card sx={{ mb: 4, borderRadius: 3, overflow: 'hidden' }}>
@@ -394,38 +466,77 @@ const Dashboard = () => {
           <Grid item xs={12} md={4}>
             {/* Stats Cards */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ height: '100%', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                  <CardContent sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <Avatar sx={{ bgcolor: '#e3f2fd', color: '#0076CE', mr: 2 }}>
-                        <AccessTimeIcon />
-                      </Avatar>
-                      <Typography variant="h3" color="primary" fontWeight="bold">
-                        {calculateDaysSinceStart()}
-                      </Typography>
-                    </Box>
-                    <Typography variant="subtitle1" color="text.secondary">
-                      Days at Dell
-                    </Typography>
-                  </CardContent>
+              {/* Days at Dell Card */}
+              <Grid item xs={12} sm={6} md={12}>
+                <Card sx={{ 
+                  height: '100%', 
+                  borderRadius: 3, 
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  p: 3,
+                  pb: 4
+                }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(0, 118, 206, 0.1)',
+                    borderRadius: '50%',
+                    width: 70,
+                    height: 70,
+                    mb: 2
+                  }}>
+                    <AccessTimeIcon sx={{ fontSize: 35, color: '#0076CE' }} />
+                  </Box>
+                  <Typography variant="h3" fontWeight="bold" align="center" gutterBottom>
+                    {calculateDaysSinceStart()}
+                  </Typography>
+                  <Typography variant="h6" align="center" color="text.secondary" sx={{ mt: 0 }}>
+                    Days at
+                  </Typography>
+                  <Typography variant="h6" align="center" color="text.secondary">
+                    Dell
+                  </Typography>
                 </Card>
               </Grid>
-              <Grid item xs={6}>
-                <Card sx={{ borderRadius: 3, height: '100%' }}>
-                  <CardContent sx={{ p: 2.5 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Typography variant="h5" fontWeight="bold" color="success.main">
-                        {modules.filter(m => m.status === 'completed').length}
-                      </Typography>
-                      <Avatar sx={{ bgcolor: 'success.light', width: 36, height: 36 }}>
-                        <CheckCircleIcon fontSize="small" />
-                      </Avatar>
-                    </Box>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      Modules Completed
-                    </Typography>
-                  </CardContent>
+              
+              {/* Modules Completed Card */}
+              <Grid item xs={12} sm={6} md={12}>
+                <Card sx={{ 
+                  height: '100%', 
+                  borderRadius: 3, 
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  p: 3,
+                  pb: 4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                    borderRadius: '50%',
+                    width: 70,
+                    height: 70,
+                    mb: 2
+                  }}>
+                    <CheckCircleIcon sx={{ fontSize: 35, color: '#1976d2' }} />
+                  </Box>
+                  <Typography variant="h3" fontWeight="bold" align="center" gutterBottom>
+                    {modules.filter(m => m.status === 'completed').length}
+                  </Typography>
+                  <Typography variant="h6" align="center" color="text.secondary" sx={{ mt: 0 }}>
+                    Modules
+                  </Typography>
+                  <Typography variant="h6" align="center" color="text.secondary">
+                    Completed
+                  </Typography>
                 </Card>
               </Grid>
             </Grid>
@@ -528,33 +639,127 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            {/* AI Assistant Card */}
-            <Card sx={{ borderRadius: 3, bgcolor: 'primary.main', color: 'white' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>AI Onboarding Assistant</Typography>
-                <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
-                <Typography variant="body2" paragraph sx={{ opacity: 0.9 }}>
-                  Have questions about your onboarding? Our AI assistant can help you find information, answer questions, and guide you through the process.
-                </Typography>
-                <Button 
-                  fullWidth 
-                  variant="contained" 
-                  sx={{ 
-                    bgcolor: 'white', 
-                    color: 'primary.main',
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.9)'
-                    }
-                  }}
-                  onClick={() => navigate('/assistant')}
-                >
-                  Ask Assistant
-                </Button>
-              </CardContent>
-            </Card>
+
           </Grid>
         </Grid>
       </Container>
+      
+      {/* Floating Chatbot Widget */}
+      <Draggable nodeRef={nodeRef} bounds="parent" handle=".drag-handle">
+        <Box
+          ref={nodeRef}
+          sx={{
+            position: 'fixed',
+            bottom: 20,
+            right: 20,
+            zIndex: 1000,
+            transition: 'all 0.3s ease',
+            width: isChatOpen ? 350 : 60,
+            height: isChatOpen ? 500 : 60,
+            borderRadius: isChatOpen ? 2 : '50%',
+            bgcolor: 'primary.main',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          {/* Chat Header - Draggable Area */}
+          <Box 
+            className="drag-handle"
+            sx={{
+              bgcolor: 'primary.dark',
+              color: 'white',
+              p: 2,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              cursor: 'move'
+            }}
+          >
+            {isChatOpen ? (
+              <>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  AI Onboarding Assistant
+                </Typography>
+                <IconButton 
+                  size="small" 
+                  onClick={() => setIsChatOpen(false)}
+                  sx={{ color: 'white' }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </>
+            ) : (
+              <Box sx={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <SmartToyIcon onClick={() => setIsChatOpen(true)} sx={{ cursor: 'pointer' }} />
+              </Box>
+            )}
+          </Box>
+          
+          {/* Chat Content - Only visible when expanded */}
+          {isChatOpen && (
+            <>
+              {/* Messages Container */}
+              <Box sx={{
+                flexGrow: 1,
+                p: 2,
+                overflowY: 'auto',
+                bgcolor: '#f5f8fa',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.5
+              }}>
+                {chatMessages.map((msg, index) => (
+                  <Box
+                    key={index}
+                    sx={{
+                      alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
+                      maxWidth: '80%',
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: msg.sender === 'user' ? 'primary.main' : 'white',
+                      color: msg.sender === 'user' ? 'white' : 'text.primary',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    <Typography variant="body2">{msg.text}</Typography>
+                  </Box>
+                ))}
+              </Box>
+              
+              {/* Input Area */}
+              <Box sx={{
+                p: 2,
+                bgcolor: 'white',
+                borderTop: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Type your question..."
+                  variant="outlined"
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  sx={{ '& fieldset': { borderRadius: 4 } }}
+                />
+                <IconButton 
+                  color="primary" 
+                  onClick={handleSendMessage}
+                  disabled={!userInput.trim()}
+                >
+                  <SendIcon />
+                </IconButton>
+              </Box>
+            </>
+          )}
+        </Box>
+      </Draggable>
     </Box>
   );
 };

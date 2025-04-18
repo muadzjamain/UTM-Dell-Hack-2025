@@ -89,28 +89,69 @@ export const summarizeDocument = async (text) => {
  */
 export const generateQuiz = async (text, numQuestions = 5) => {
   try {
-    const prompt = `Based on the following content, generate a quiz with ${numQuestions} multiple-choice questions. 
-    For each question, provide 4 options and indicate the correct answer. 
-    Format the response as a JSON array with objects containing: question, options (array), and correctAnswer (index of correct option).\n\n${text}`;
+    const prompt = `You are an expert quiz creator. 
+    Based ONLY on the following document content, generate a quiz with ${numQuestions} multiple-choice questions.
+    
+    EXTREMELY IMPORTANT INSTRUCTIONS:
+    1. Create questions that are DIRECTLY related to the content provided. DO NOT reference Dell Technologies unless the document explicitly mentions Dell.
+    2. ONLY use information that is explicitly stated in the document content. Do not make up or infer information.
+    3. Questions should test understanding of key concepts in the document.
+    4. For each question, provide 4 options where only one is correct.
+    5. Make sure the correct answer is clearly supported by the document content.
+    6. If the document is an image with text, focus on the visible text content.
+    7. If the document is technical, create questions that test technical understanding.
+    8. Format the response as a JSON array with objects containing: question, options (array), and correctAnswer (index of correct option).
+    9. DO NOT create questions about Dell Technologies, Dell values, Dell organizational structure, or Dell systems unless these are explicitly mentioned in the document.
+    
+    Here is the document content to use (focus ONLY on this content):
+    ${text}`;
     
     const response = await generateResponse(prompt);
     const quizText = response.parts[0].text;
     
     // Extract the JSON part from the response
     const jsonMatch = quizText.match(/```json\n([\s\S]*?)\n```/) || 
+                      quizText.match(/```([\s\S]*?)```/) ||
                       quizText.match(/\[([\s\S]*?)\]/) ||
                       quizText;
     
-    const jsonString = jsonMatch[1] || quizText;
-    return JSON.parse(jsonString);
+    let jsonString = jsonMatch[1] || quizText;
+    
+    // Clean up the string if needed
+    jsonString = jsonString.trim();
+    if (!jsonString.startsWith('[')) {
+      jsonString = '[' + jsonString;
+    }
+    if (!jsonString.endsWith(']')) {
+      jsonString = jsonString + ']';
+    }
+    
+    try {
+      return JSON.parse(jsonString);
+    } catch (parseError) {
+      console.error('Error parsing quiz JSON:', parseError);
+      // Try to extract just the array part
+      const arrayMatch = jsonString.match(/\[([\s\S]*?)\]/);
+      if (arrayMatch && arrayMatch[0]) {
+        return JSON.parse(arrayMatch[0]);
+      }
+      throw parseError;
+    }
   } catch (error) {
     console.error('Error generating quiz:', error);
     // Return a fallback quiz if parsing fails
+    // Create generic fallback questions based on the document title
+    const docTitle = text.split('\n')[0] || 'this document';
     return [
       {
-        question: "What is the main topic of this document?",
-        options: ["Option A", "Option B", "Option C", "Option D"],
+        question: `What is the main topic of "${docTitle}"?`,
+        options: ["Understanding key concepts", "Technical specifications", "Logical principles", "Programming fundamentals"],
         correctAnswer: 0
+      },
+      {
+        question: `Which of the following best describes the purpose of "${docTitle}"?`,
+        options: ["To provide technical training", "To explain theoretical concepts", "To demonstrate practical applications", "To compare different methodologies"],
+        correctAnswer: 1
       }
     ];
   }
