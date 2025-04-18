@@ -4,6 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box, CircularProgress } from '@mui/material';
 import Navbar from './components/Navbar';
+import DellAssistant from './components/DellAssistant';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -15,17 +16,37 @@ import FinalReview from './pages/FinalReview';
 import Profile from './pages/Profile';
 import PersonalizedGoals from './pages/PersonalizedGoals';
 import StudyCompanion from './pages/StudyCompanion';
+import TeamDashboard from './pages/TeamDashboard';
 import theme from './theme/theme';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      
+      if (currentUser) {
+        try {
+          // Fetch user profile data for the Dell Assistant
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            setUserProfile(userDoc.data());
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        }
+      } else {
+        setUserProfile(null);
+      }
+      
       setLoading(false);
     });
 
@@ -60,7 +81,11 @@ function App() {
           <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
           <Route path="/goals" element={user ? <PersonalizedGoals /> : <Navigate to="/login" />} />
           <Route path="/study-companion" element={user ? <StudyCompanion /> : <Navigate to="/login" />} />
+          <Route path="/team-dashboard" element={user ? <TeamDashboard /> : <Navigate to="/login" />} />
         </Routes>
+        
+        {/* Dell Assistant Chat Widget - Only shown when user is logged in */}
+        {user && <DellAssistant userProfile={userProfile} />}
       </Router>
     </ThemeProvider>
   );

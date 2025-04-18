@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -8,6 +8,7 @@ import {
   Stepper,
   Step,
   StepLabel,
+  Checkbox,
   FormControl,
   InputLabel,
   Select,
@@ -45,12 +46,35 @@ const LEARNING_STYLES = [
   { value: 'kinesthetic', label: 'Kinesthetic', description: 'Learns best through hands-on activities and practice' }
 ];
 
-const StudyPlanGenerator = ({ content, onClose }) => {
+const StudyPlanGenerator = ({ content, onClose, onSavePlan, studyPlanHistory = [], onUpdateProgress = () => {}, studyPlan: initialStudyPlan = null }) => {
+  console.log('StudyPlanGenerator received initialStudyPlan:', initialStudyPlan);
   const theme = useTheme();
-  const [activeStep, setActiveStep] = useState(0);
+  // If initialStudyPlan is provided, start at step 2 (plan display)
+  const [activeStep, setActiveStep] = useState(initialStudyPlan ? 2 : 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [studyPlan, setStudyPlan] = useState(null);
+  
+  // Initialize studyPlan state with initialStudyPlan or try to get from localStorage
+  const [studyPlan, setStudyPlan] = useState(() => {
+    if (initialStudyPlan) {
+      console.log('Using initialStudyPlan:', initialStudyPlan);
+      return initialStudyPlan;
+    }
+    
+    // Try to get from localStorage as fallback
+    const savedPlan = localStorage.getItem('training_studyPlan');
+    if (savedPlan) {
+      try {
+        const parsedPlan = JSON.parse(savedPlan);
+        console.log('Using plan from localStorage:', parsedPlan);
+        return parsedPlan;
+      } catch (e) {
+        console.error('Error parsing saved plan:', e);
+      }
+    }
+    
+    return null;
+  });
   
   // Form state
   const [startDate, setStartDate] = useState(new Date());
@@ -61,6 +85,29 @@ const StudyPlanGenerator = ({ content, onClose }) => {
   
   // Estimate study time based on content
   const estimatedTime = estimateStudyTime(content);
+  
+  // Effect to update localStorage when studyPlan changes
+  useEffect(() => {
+    if (studyPlan) {
+      console.log('Saving studyPlan to localStorage:', studyPlan);
+      localStorage.setItem('training_studyPlan', JSON.stringify(studyPlan));
+    }
+  }, [studyPlan]);
+  
+  // Effect to handle initialStudyPlan changes
+  useEffect(() => {
+    if (initialStudyPlan) {
+      console.log('initialStudyPlan changed, updating state:', initialStudyPlan);
+      setStudyPlan(initialStudyPlan);
+      setActiveStep(2); // Skip to the plan display step
+    }
+  }, [initialStudyPlan]);
+  
+  // Helper function to get learning style label
+  const getLearningStyleLabel = (value) => {
+    const style = LEARNING_STYLES.find(style => style.value === value);
+    return style ? style.label : 'Visual';
+  };
   
   const handleNext = () => {
     setActiveStep((prevStep) => prevStep + 1);
@@ -106,7 +153,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
     if (!studyPlan) return;
     
     // Create a formatted text version of the study plan
-    let planText = `# EduZen Personalized Study Plan\n\n`;
+    let planText = `# Dell Personalized Training Plan\n\n`;
     planText += `## Overview\n${studyPlan.overview}\n\n`;
     
     studyPlan.days.forEach(day => {
@@ -132,7 +179,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'EduZen_Study_Plan.txt';
+    a.download = 'Dell_Training_Plan.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -146,7 +193,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
         return (
           <Box>
             <Typography variant="h6" gutterBottom>
-              Study Plan Preferences
+              Training Plan Preferences
             </Typography>
             
             <Grid container spacing={3}>
@@ -184,7 +231,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
               
               <Grid item xs={12} md={6}>
                 <Typography gutterBottom>
-                  Available Study Time (minutes per day)
+                  Available Training Time (minutes per day)
                 </Typography>
                 <Slider
                   value={timeAvailable}
@@ -249,7 +296,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
               <Grid item xs={12}>
                 <Alert severity="info" sx={{ mt: 2 }}>
                   <Typography variant="body2">
-                    <strong>Estimated study time:</strong> {estimatedTime.studyTime} minutes total
+                    <strong>Estimated training time:</strong> {estimatedTime.studyTime} minutes total
                     <br />
                     <strong>Recommended days:</strong> {estimatedTime.recommendedDays} days (at {Math.ceil(estimatedTime.studyTime / estimatedTime.recommendedDays)} minutes per day)
                   </Typography>
@@ -265,9 +312,9 @@ const StudyPlanGenerator = ({ content, onClose }) => {
             {loading ? (
               <>
                 <CircularProgress size={60} sx={{ mb: 3 }} />
-                <Typography variant="h6">Generating your personalized study plan...</Typography>
+                <Typography variant="h6">Generating your personalized training plan...</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  This may take a moment as our AI creates a tailored plan for you
+                  Creating a personalized training plan based on your preferences...
                 </Typography>
               </>
             ) : (
@@ -278,7 +325,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
                   </Alert>
                 ) : (
                   <Alert severity="success" sx={{ mb: 3 }}>
-                    Your study plan is ready!
+                    Your training plan is ready!
                   </Alert>
                 )}
                 
@@ -310,11 +357,11 @@ const StudyPlanGenerator = ({ content, onClose }) => {
             {studyPlan && (
               <>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: theme.palette.primary.main }}>
-                    Your Personalized Study Plan
+                  <Typography variant="h5" sx={{ fontWeight: 500, color: '#1565C0' }}>
+                    Your Personalized Training Plan
                   </Typography>
                   
-                  <Tooltip title="Download Study Plan">
+                  <Tooltip title="Download Training Plan">
                     <IconButton onClick={handleDownloadPlan} color="primary">
                       <DownloadIcon />
                     </IconButton>
@@ -331,7 +378,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
                   </CardContent>
                 </Card>
                 
-                <Typography variant="h6" sx={{ mb: 2 }}>Study Schedule</Typography>
+                <Typography variant="h6" sx={{ mb: 2 }}>Training Schedule</Typography>
                 
                 <Box sx={{ mb: 4 }}>
                   {studyPlan.days.map((day) => (
@@ -345,7 +392,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}>
-                        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 500 }}>
                           Day {day.day}
                         </Typography>
                         <Typography variant="body1">
@@ -370,9 +417,43 @@ const StudyPlanGenerator = ({ content, onClose }) => {
                                     : 'rgba(255, 152, 0, 0.1)'
                             }}>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                                  {session.title}
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                  <Checkbox 
+                                    checked={studyPlan.completedSessions?.includes(`${day.day}-${index}`) || false}
+                                    onChange={(e) => {
+                                      const sessionId = `${day.day}-${index}`;
+                                      const newPlan = {...studyPlan};
+                                      
+                                      if (!newPlan.completedSessions) {
+                                        newPlan.completedSessions = [];
+                                      }
+                                      
+                                      if (e.target.checked) {
+                                        if (!newPlan.completedSessions.includes(sessionId)) {
+                                          newPlan.completedSessions.push(sessionId);
+                                        }
+                                      } else {
+                                        newPlan.completedSessions = newPlan.completedSessions.filter(id => id !== sessionId);
+                                      }
+                                      
+                                      // Calculate progress percentage
+                                      const totalSessions = studyPlan.days.reduce((total, d) => total + d.sessions.length, 0);
+                                      newPlan.progress = Math.round((newPlan.completedSessions.length / totalSessions) * 100);
+                                      
+                                      setStudyPlan(newPlan);
+                                      onUpdateProgress(newPlan);
+                                    }}
+                                    sx={{ 
+                                      color: '#1565C0',
+                                      '&.Mui-checked': {
+                                        color: '#1565C0',
+                                      },
+                                    }}
+                                  />
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                                    Training Session {index + 1}
+                                  </Typography>
+                                </Box>
                                 <Chip 
                                   label={`${session.duration} min`} 
                                   size="small" 
@@ -411,7 +492,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
                   <CardContent>
                     <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                       <SchoolIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
-                      Study Tips
+                      Training Tips
                     </Typography>
                     <Box component="ul" sx={{ pl: 2 }}>
                       {studyPlan.tips.map((tip, index) => (
@@ -434,9 +515,8 @@ const StudyPlanGenerator = ({ content, onClose }) => {
   
   return (
     <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-      <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <EventNoteIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
-        Create Personalized Study Plan
+      <Typography variant="h4" gutterBottom align="center" sx={{ mb: 4, color: '#1565C0', fontWeight: 500 }}>
+        Create Personalized Training Plan
       </Typography>
       
       <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
@@ -469,7 +549,7 @@ const StudyPlanGenerator = ({ content, onClose }) => {
                 onClick={handleGeneratePlan}
                 disabled={loading}
               >
-                Generate Study Plan
+                Generate Training Plan
               </Button>
             )}
             
@@ -477,7 +557,22 @@ const StudyPlanGenerator = ({ content, onClose }) => {
               <Button
                 variant="contained"
                 color="primary"
-                onClick={onClose}
+                onClick={() => {
+                  // Save the current study plan to history before closing
+                  if (studyPlan) {
+                    // Add timestamp and title for history identification
+                    const planWithMeta = {
+                      ...studyPlan,
+                      timestamp: new Date().toISOString(),
+                      title: `Training Plan (${format(new Date(), 'MMM d, yyyy')})`
+                    };
+                    onSavePlan(planWithMeta);
+                  }
+                  // Reset to preferences step without closing
+                  setActiveStep(0);
+                  // Clear the current study plan to start fresh
+                  setStudyPlan(null);
+                }}
               >
                 Done
               </Button>

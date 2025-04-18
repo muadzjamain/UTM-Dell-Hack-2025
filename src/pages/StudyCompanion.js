@@ -15,13 +15,15 @@ import {
   CardMedia,
   IconButton,
   Dialog,
-  DialogContent,
   DialogTitle,
+  DialogContent,
+  DialogContentText,
   DialogActions,
   Divider,
   Stepper,
   Step,
   StepLabel,
+  Chip,
   Alert,
   Snackbar,
   FormControl,
@@ -44,6 +46,12 @@ import SummarizeIcon from '@mui/icons-material/Summarize';
 import QuizIcon from '@mui/icons-material/Quiz';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import EventNoteIcon from '@mui/icons-material/EventNote';
+import TimerIcon from '@mui/icons-material/Timer';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { storage, db } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc } from 'firebase/firestore';
@@ -69,25 +77,57 @@ const StudyCompanion = () => {
   const [success, setSuccess] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
   
+  // Dialog states
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState(null);
+  
   // Tab states (matching EduZen design)
-  const [tabValue, setTabValue] = useState(0); // 0: Upload Content, 1: Summary, 2: Quiz, 3: Study Plan
+  const [tabValue, setTabValue] = useState(() => {
+    return parseInt(localStorage.getItem('training_tabValue') || '0', 10);
+  }); // 0: Upload Content, 1: Summary, 2: Quiz, 3: Study Plan
   
   // Content upload states
-  const [uploadType, setUploadType] = useState('image'); // 'image', 'camera', 'pdf'
+  const [uploadType, setUploadType] = useState(() => {
+    return localStorage.getItem('training_uploadType') || 'image'; // 'image', 'camera', or 'pdf'
+  });
   const [uploadedFile, setUploadedFile] = useState(null);
   const [fileUrl, setFileUrl] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   
   // Content analysis states
-  const [extractedText, setExtractedText] = useState('');
-  const [summary, setSummary] = useState('');
+  const [extractedText, setExtractedText] = useState(() => {
+    return localStorage.getItem('training_extractedText') || '';
+  });
+  const [summary, setSummary] = useState(() => {
+    return localStorage.getItem('training_summary') || '';
+  });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   // Quiz states
-  const [quiz, setQuiz] = useState([]);
-  const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [quizScore, setQuizScore] = useState(null);
+  const [quiz, setQuiz] = useState(() => {
+    const savedQuiz = localStorage.getItem('training_quiz');
+    return savedQuiz ? JSON.parse(savedQuiz) : [];
+  });
+  const [selectedAnswers, setSelectedAnswers] = useState(() => {
+    const savedAnswers = localStorage.getItem('training_selectedAnswers');
+    return savedAnswers ? JSON.parse(savedAnswers) : {};
+  });
+  const [quizSubmitted, setQuizSubmitted] = useState(() => {
+    return localStorage.getItem('training_quizSubmitted') === 'true';
+  });
+  const [quizScore, setQuizScore] = useState(() => {
+    return parseInt(localStorage.getItem('training_quizScore') || '0', 10);
+  });
+  const [studyPlan, setStudyPlan] = useState(() => {
+    const savedPlan = localStorage.getItem('training_studyPlan');
+    return savedPlan ? JSON.parse(savedPlan) : null;
+  });
+  
+  // Study plan history
+  const [studyPlanHistory, setStudyPlanHistory] = useState(() => {
+    const savedHistory = localStorage.getItem('training_studyPlanHistory');
+    return savedHistory ? JSON.parse(savedHistory) : [];
+  });
   
   // Refs
   const fileInputRef = useRef(null);
@@ -100,6 +140,65 @@ const StudyCompanion = () => {
     if (!text) return '';
     return text.replace(/\*\*(.*?)\*\*/g, '$1');
   };
+
+  // Helper functions to save state to localStorage
+  const setExtractedTextWithFormat = (text) => {
+    setExtractedText(text);
+    localStorage.setItem('training_extractedText', text);
+  };
+  
+  const setSummaryWithFormat = (summary) => {
+    setSummary(summary);
+    localStorage.setItem('training_summary', summary);
+  };
+  
+  const setQuizWithStorage = (quizData) => {
+    setQuiz(quizData);
+    localStorage.setItem('training_quiz', JSON.stringify(quizData));
+  };
+  
+  // Save state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('training_uploadType', uploadType);
+  }, [uploadType]);
+  
+  useEffect(() => {
+    localStorage.setItem('training_tabValue', tabValue.toString());
+  }, [tabValue]);
+  
+  useEffect(() => {
+    if (Object.keys(selectedAnswers).length > 0) {
+      localStorage.setItem('training_selectedAnswers', JSON.stringify(selectedAnswers));
+    }
+  }, [selectedAnswers]);
+  
+  useEffect(() => {
+    localStorage.setItem('training_quizSubmitted', quizSubmitted.toString());
+  }, [quizSubmitted]);
+  
+  useEffect(() => {
+    if (quizScore !== null) {
+      localStorage.setItem('training_quizScore', quizScore.toString());
+    }
+  }, [quizScore]);
+
+  useEffect(() => {
+    if (studyPlan) {
+      localStorage.setItem('training_studyPlan', JSON.stringify(studyPlan));
+      
+      // Add to history if it's a new plan
+      const planExists = studyPlanHistory.some(plan => 
+        plan.timestamp === studyPlan.timestamp && 
+        plan.title === studyPlan.title
+      );
+      
+      if (!planExists) {
+        const updatedHistory = [studyPlan, ...studyPlanHistory].slice(0, 10); // Keep last 10 plans
+        setStudyPlanHistory(updatedHistory);
+        localStorage.setItem('training_studyPlanHistory', JSON.stringify(updatedHistory));
+      }
+    }
+  }, [studyPlan, studyPlanHistory]);
 
   // Initialize Google API
   useEffect(() => {
@@ -283,7 +382,7 @@ const StudyCompanion = () => {
       
       // Format text to remove ** markers
       text = formatText(text);
-      setExtractedText(text);
+      setExtractedTextWithFormat(text);
       
       // Generate summary
       let generatedSummary = '';
@@ -296,34 +395,32 @@ const StudyCompanion = () => {
           generatedSummary = await summarizeText(text);
         }
         generatedSummary = formatText(generatedSummary);
+        setSummaryWithFormat(generatedSummary);
       } catch (error) {
         console.error('Error generating summary:', error);
         generatedSummary = 'Failed to generate summary. Please try again.';
       }
-      setSummary(generatedSummary);
       
       // Generate quiz
       let generatedQuiz = [];
       try {
         setStatusMessage('Creating quiz questions...');
         if (uploadType === 'pdf') {
-          generatedQuiz = await generatePDFQuiz(text);
+          generatedQuiz = await generatePDFQuiz(uploadedFile);
         } else {
           generatedQuiz = await generateQuiz(text);
         }
-        console.log('Generated quiz questions:', generatedQuiz.length);
       } catch (error) {
         console.error('Error generating quiz:', error);
-        // Create a simple fallback quiz if generation fails
         generatedQuiz = [
           {
-            question: 'What was the main topic of the content you uploaded?',
+            question: 'What is the main topic of this content?',
             options: ['Option A', 'Option B', 'Option C', 'Option D'],
             correctAnswer: 0
           }
         ];
       }
-      setQuiz(generatedQuiz);
+      setQuizWithStorage(generatedQuiz);
       
       // Try to save to Firestore, but don't block if it fails
       try {
@@ -394,6 +491,100 @@ const StudyCompanion = () => {
     setQuizScore(null);
   };
   
+  const handleReset = () => {
+    // Reset state
+    setUploadedFile(null);
+    setFileUrl(null);
+    setExtractedText('');
+    setSummary('');
+    setQuiz([]);
+    setSelectedAnswers({});
+    setQuizSubmitted(false);
+    setQuizScore(null);
+    setTabValue(0);
+    setError(null);
+    setSuccess(null);
+    setStatusMessage('');
+    
+    // Clear localStorage
+    localStorage.removeItem('training_extractedText');
+    localStorage.removeItem('training_summary');
+    localStorage.removeItem('training_quiz');
+    localStorage.removeItem('training_selectedAnswers');
+    localStorage.removeItem('training_quizSubmitted');
+    localStorage.removeItem('training_quizScore');
+    localStorage.removeItem('training_tabValue');
+    localStorage.removeItem('training_uploadType');
+    localStorage.removeItem('training_studyPlan');
+    // Note: We don't clear study plan history
+  };
+  
+  // Load a study plan from history
+  const loadStudyPlan = (plan) => {
+    console.log('Loading plan:', plan);
+    // Save the current plan to localStorage so it can be accessed by StudyPlanGenerator
+    localStorage.setItem('training_studyPlan', JSON.stringify(plan));
+    // Set the study plan state
+    setStudyPlan(plan);
+    // Force a re-render by setting a timeout
+    setTimeout(() => {
+      setTabValue(3); // Navigate to study plan tab
+    }, 50);
+  };
+  
+  // Clear study plan history
+  const clearStudyPlanHistory = () => {
+    setStudyPlanHistory([]);
+    localStorage.removeItem('training_studyPlanHistory');
+  };
+  
+  // Delete a specific plan from history
+  const deletePlan = (index) => {
+    const updatedHistory = [...studyPlanHistory];
+    updatedHistory.splice(index, 1);
+    setStudyPlanHistory(updatedHistory);
+    localStorage.setItem('training_studyPlanHistory', JSON.stringify(updatedHistory));
+  };
+  
+  // Rename a plan in history
+  const renamePlan = (index, newTitle) => {
+    const updatedHistory = [...studyPlanHistory];
+    updatedHistory[index] = {
+      ...updatedHistory[index],
+      title: newTitle
+    };
+    setStudyPlanHistory(updatedHistory);
+    localStorage.setItem('training_studyPlanHistory', JSON.stringify(updatedHistory));
+  };
+  
+  // Update plan progress
+  const updatePlanProgress = (index, sessionIndex, completed) => {
+    const updatedHistory = [...studyPlanHistory];
+    const plan = {...updatedHistory[index]};
+    
+    // Initialize completedSessions if it doesn't exist
+    if (!plan.completedSessions) {
+      plan.completedSessions = [];
+    }
+    
+    // Add or remove session from completed list
+    if (completed) {
+      if (!plan.completedSessions.includes(sessionIndex)) {
+        plan.completedSessions.push(sessionIndex);
+      }
+    } else {
+      plan.completedSessions = plan.completedSessions.filter(i => i !== sessionIndex);
+    }
+    
+    // Calculate progress percentage
+    const totalSessions = plan.days.reduce((total, day) => total + day.sessions.length, 0);
+    plan.progress = Math.round((plan.completedSessions.length / totalSessions) * 100);
+    
+    updatedHistory[index] = plan;
+    setStudyPlanHistory(updatedHistory);
+    localStorage.setItem('training_studyPlanHistory', JSON.stringify(updatedHistory));
+  };
+  
   // Render the main UI
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -430,8 +621,7 @@ const StudyCompanion = () => {
         </Typography>
         
         <Typography variant="body1" paragraph align="center" sx={{ mb: 4 }}>
-          Upload your study materials or capture images with your camera. Our AI will extract the text, generate a
-          summary, and create a quiz to help you study.
+          Upload your training materials or capture images with your camera. Our AI will extract the text, generate a summary, and create a quiz to help you master the content.
         </Typography>
         
         {/* Error and success messages */}
@@ -509,7 +699,7 @@ const StudyCompanion = () => {
             />
             <Tab 
               icon={<CalendarMonthIcon />} 
-              label="Study Plan" 
+              label="Training Plan" 
               id="tab-3" 
               aria-controls="tabpanel-3"
               disabled={!summary} 
@@ -577,7 +767,7 @@ const StudyCompanion = () => {
                         Upload Image
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Upload an image of your notes, textbook, or other study materials
+                        Upload an image of your documentation, manual, or other training materials
                       </Typography>
                       <input
                         ref={fileInputRef}
@@ -689,7 +879,7 @@ const StudyCompanion = () => {
                         Upload PDF
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Upload a PDF document of your study materials
+                        Upload a PDF document of your manual, documentation, or other training materials
                       </Typography>
                       <input
                         ref={pdfInputRef}
@@ -903,7 +1093,7 @@ const StudyCompanion = () => {
                         }
                       }}
                     >
-                      Create Study Plan
+                      Create Training Plan
                     </Button>
                   </Box>
                 </>
@@ -1091,12 +1281,229 @@ const StudyCompanion = () => {
         
         {/* Study Plan Tab */}
         <Box role="tabpanel" hidden={tabValue !== 3} id="tabpanel-3" aria-labelledby="tab-3">
-          {tabValue === 3 && summary && (
+          {tabValue === 3 && (
             <Box>
               <StudyPlanGenerator 
                 content={extractedText} 
-                onClose={() => setActiveTab(1)}
+                onClose={() => setTabValue(1)}
+                onSavePlan={(plan) => {
+                  // Only create a new plan if it's not loaded from history
+                  if (!studyPlan || !studyPlan.timestamp) {
+                    const timestamp = Date.now();
+                    const newPlan = {
+                      ...plan,
+                      timestamp,
+                      title: `Training Plan ${studyPlanHistory.length + 1}`,
+                      progress: 0,
+                      completedSessions: []
+                    };
+                    setStudyPlan(newPlan);
+                    const updatedHistory = [newPlan, ...studyPlanHistory];
+                    setStudyPlanHistory(updatedHistory);
+                    localStorage.setItem('training_studyPlanHistory', JSON.stringify(updatedHistory));
+                  } else {
+                    // If it's loaded from history, just set it
+                    setStudyPlan(plan);
+                  }
+                }}
+                // Pass the current studyPlan to the component
+                studyPlan={studyPlan}
+                studyPlanHistory={studyPlanHistory}
+                onUpdateProgress={(updatedPlan) => {
+                  // Find the plan in history and update it
+                  const updatedHistory = studyPlanHistory.map(plan => {
+                    if (plan.timestamp === updatedPlan.timestamp) {
+                      return {
+                        ...plan,
+                        completedSessions: updatedPlan.completedSessions,
+                        progress: updatedPlan.progress
+                      };
+                    }
+                    return plan;
+                  });
+                  
+                  // Update state and localStorage
+                  setStudyPlanHistory(updatedHistory);
+                  localStorage.setItem('training_studyPlanHistory', JSON.stringify(updatedHistory));
+                }}
               />
+              
+              {/* Study Plan History Section */}
+              {studyPlanHistory.length > 0 && (
+                <Box sx={{ mt: 6 }}>
+                  <Divider sx={{ mb: 4 }} />
+                  <Typography variant="h5" gutterBottom sx={{ 
+                    color: '#1565C0', 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    mb: 3
+                  }}>
+                    <EventNoteIcon sx={{ mr: 1 }} />
+                    Training Plan History
+                  </Typography>
+                  
+                  <Grid container spacing={3}>
+                    {studyPlanHistory.map((plan, index) => (
+                      <Grid item xs={12} md={6} lg={4} key={index}>
+                        <Card 
+                          elevation={2} 
+                          sx={{ 
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              transform: 'translateY(-4px)',
+                              boxShadow: '0 8px 24px rgba(21, 101, 192, 0.15)'
+                            }
+                          }}
+                        >
+                          <Box sx={{ 
+                            bgcolor: 'rgba(21, 101, 192, 0.08)', 
+                            p: 2, 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <IconButton 
+                                size="small" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newTitle = prompt('Enter new title:', plan.title);
+                                  if (newTitle && newTitle.trim()) {
+                                    renamePlan(index, newTitle.trim());
+                                  }
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <Typography variant="h6" sx={{ fontWeight: 500, color: '#1565C0', ml: 1 }}>
+                                {plan.title || `Training Plan ${index + 1}`}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Chip 
+                                label={new Date(plan.timestamp).toLocaleDateString()} 
+                                size="small" 
+                                color="primary" 
+                                variant="outlined"
+                                sx={{ mr: 1 }}
+                              />
+                              <IconButton 
+                                size="small" 
+                                color="error"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPlanToDelete(index);
+                                  setConfirmDialogOpen(true);
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                          
+                          <CardContent sx={{ flexGrow: 1 }}>
+                            {/* Progress bar */}
+                            <Box sx={{ mb: 2 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                <Typography variant="body2" fontWeight="medium">
+                                  Progress
+                                </Typography>
+                                <Typography variant="body2" color="primary" fontWeight="bold">
+                                  {plan.progress || 0}%
+                                </Typography>
+                              </Box>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={plan.progress || 0} 
+                                sx={{ 
+                                  height: 8, 
+                                  borderRadius: 4,
+                                  backgroundColor: 'rgba(21, 101, 192, 0.1)',
+                                  '& .MuiLinearProgress-bar': {
+                                    backgroundColor: '#1565C0'
+                                  }
+                                }}
+                              />
+                            </Box>
+                            
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                              {plan.overview ? plan.overview.substring(0, 100) + '...' : 'No overview available'}
+                            </Typography>
+                            
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                              <TimerIcon sx={{ fontSize: 16, color: '#1565C0', mr: 1 }} />
+                              <Typography variant="body2">
+                                {plan.timeAvailable || plan.days?.[0]?.sessions?.reduce((acc, session) => acc + parseInt(session.duration || 0, 10), 0) || 0} minutes/day
+                              </Typography>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                              <ScheduleIcon sx={{ fontSize: 16, color: '#1565C0', mr: 1 }} />
+                              <Typography variant="body2">
+                                {plan.days?.length || plan.daysToComplete || 7} days
+                              </Typography>
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <AccessTimeIcon sx={{ fontSize: 16, color: '#1565C0', mr: 1 }} />
+                              <Typography variant="body2">
+                                Saved on {new Date(plan.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </Typography>
+                            </Box>
+                          </CardContent>
+                          
+                          <Box sx={{ 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            p: 1, 
+                            borderTop: '1px solid rgba(0, 0, 0, 0.05)'
+                          }}>
+                            <Button 
+                              variant="contained" 
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent event bubbling
+                                console.log('View Details clicked for plan:', plan);
+                                loadStudyPlan(plan);
+                              }}
+                              sx={{ 
+                                borderRadius: '20px',
+                                textTransform: 'none'
+                              }}
+                            >
+                              View Details
+                            </Button>
+                          </Box>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                  
+                  {/* Clear history button */}
+                  {studyPlanHistory.length > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={clearStudyPlanHistory}
+                        sx={{ 
+                          borderRadius: '20px',
+                          px: 3,
+                          py: 1,
+                          textTransform: 'none'
+                        }}
+                      >
+                        Clear History
+                      </Button>
+                    </Box>
+                  )}
+                </Box>
+              )}
             </Box>
           )}
         </Box>
@@ -1141,6 +1548,41 @@ const StudyCompanion = () => {
             sx={{ borderRadius: '20px' }}
           >
             Take Picture
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => setConfirmDialogOpen(false)}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">
+          Delete Training Plan
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Are you sure you want to delete this training plan? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialogOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => {
+              if (planToDelete !== null) {
+                deletePlan(planToDelete);
+                setPlanToDelete(null);
+              }
+              setConfirmDialogOpen(false);
+            }} 
+            color="error" 
+            autoFocus
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

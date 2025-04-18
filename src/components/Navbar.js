@@ -154,7 +154,8 @@ const Navbar = ({ user }) => {
             Deltri
           </Typography>
           
-          {userRole !== 'employee' && (
+          {/* Only show manager badge when user is logged in and has manager role */}
+          {user && userRole !== 'employee' && (
             <Chip 
               label={userRole.toUpperCase()}
               color="secondary"
@@ -195,12 +196,15 @@ const Navbar = ({ user }) => {
                 <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white' }}>
                   <Typography variant="h6">{userProfile.firstName} {userProfile.lastName}</Typography>
                   <Typography variant="body2">{userProfile.email}</Typography>
-                  <Chip 
-                    label={userRole.toUpperCase()} 
-                    size="small" 
-                    color="secondary"
-                    sx={{ mt: 1, fontWeight: 'bold' }}
-                  />
+                  {/* Only show role chip when user has a role other than employee */}
+                  {userRole !== 'employee' && (
+                    <Chip 
+                      label={userRole.toUpperCase()} 
+                      size="small" 
+                      color="secondary"
+                      sx={{ mt: 1, fontWeight: 'bold' }}
+                    />
+                  )}
                 </Box>
               )}
               
@@ -366,11 +370,13 @@ const Navbar = ({ user }) => {
                       <Typography variant="body2" color="text.secondary">
                         {userProfile.email}
                       </Typography>
-                      <Chip 
-                        label={userProfile.department} 
-                        size="small" 
-                        sx={{ mt: 1 }}
-                      />
+                      {userRole !== 'manager' && (
+                        <Chip 
+                          label={userProfile.department} 
+                          size="small" 
+                          sx={{ mt: 1 }}
+                        />
+                      )}
                       <Divider sx={{ my: 1 }} />
                     </Box>
                   )}
