@@ -22,6 +22,7 @@ import {
   Divider,
   Chip
 } from '@mui/material';
+import DeltriLogo from '../images/Deltri_Logo.png';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SchoolIcon from '@mui/icons-material/School';
@@ -111,16 +112,21 @@ const Navbar = ({ user }) => {
   // Define navigation based on user role
   const employeePages = [
     { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
-    { name: 'Culture Rules', path: '/culture-compliance', icon: <BusinessIcon /> },
     { name: 'Training', path: '/study-companion', icon: <MenuBookIcon /> },
     { name: 'Personalized Goals', path: '/goals', icon: <FlagIcon /> },
     { name: 'Performance', path: '/performance-feedback', icon: <AssessmentIcon /> },
+    { name: 'Culture Rules', path: '/culture-compliance', icon: <BusinessIcon /> },
     { name: 'Support', path: '/support', icon: <HelpIcon /> },
   ];
   
   const managerPages = [
-    ...employeePages,
+    { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
     { name: 'Team Dashboard', path: '/team-dashboard', icon: <AdminPanelSettingsIcon /> },
+    { name: 'Training', path: '/study-companion', icon: <MenuBookIcon /> },
+    { name: 'Personalized Goals', path: '/goals', icon: <FlagIcon /> },
+    { name: 'Performance', path: '/performance-feedback', icon: <AssessmentIcon /> },
+    { name: 'Culture Rules', path: '/culture-compliance', icon: <BusinessIcon /> },
+    { name: 'Support', path: '/support', icon: <HelpIcon /> },
   ];
   
   // Select pages based on user role
@@ -136,23 +142,26 @@ const Navbar = ({ user }) => {
       <Container maxWidth="xl">
         <Toolbar disableGutters>
           {/* Logo for larger screens */}
-          <Typography
-            variant="h6"
-            noWrap
+          <Box
             component={RouterLink}
-            to="/"
+            to={user ? "/dashboard" : "/"}
             sx={{
               mr: 2,
               display: { xs: 'none', md: 'flex' },
-              fontFamily: 'monospace',
-              fontWeight: 700,
-              letterSpacing: '.3rem',
-              color: 'inherit',
               textDecoration: 'none',
             }}
           >
-            Deltri
-          </Typography>
+            <Box
+              component="img"
+              src={DeltriLogo}
+              alt="Deltri Logo"
+              sx={{
+                height: 40,
+                width: 'auto',
+                display: 'block'
+              }}
+            />
+          </Box>
           
           {/* Only show manager badge when user is logged in and has manager role */}
           {user && userRole !== 'employee' && (
@@ -279,24 +288,27 @@ const Navbar = ({ user }) => {
           </Drawer>
           
           {/* Logo for mobile screens */}
-          <Typography
-            variant="h6"
-            noWrap
+          <Box
             component={RouterLink}
-            to="/"
+            to={user ? "/dashboard" : "/"}
             sx={{
               mr: 2,
               display: { xs: 'flex', md: 'none' },
               flexGrow: 1,
-              fontFamily: 'monospace',
-              fontWeight: 700,
-              letterSpacing: '.3rem',
-              color: 'inherit',
               textDecoration: 'none',
             }}
           >
-            Deltri
-          </Typography>
+            <Box
+              component="img"
+              src={DeltriLogo}
+              alt="Deltri Logo"
+              sx={{
+                height: 35,
+                width: 'auto',
+                display: 'block'
+              }}
+            />
+          </Box>
           
           {/* Desktop navigation */}
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }}>
