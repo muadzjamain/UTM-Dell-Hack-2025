@@ -23,7 +23,8 @@ import {
   Chip,
   IconButton,
   Tooltip,
-  useTheme
+  useTheme,
+  Snackbar
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -53,6 +54,8 @@ const StudyPlanGenerator = ({ content, onClose, onSavePlan, studyPlanHistory = [
   const [activeStep, setActiveStep] = useState(initialStudyPlan ? 2 : 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // State for the snackbar notification
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
   
   // Initialize studyPlan state with initialStudyPlan or try to get from localStorage
   const [studyPlan, setStudyPlan] = useState(() => {
@@ -567,6 +570,8 @@ const StudyPlanGenerator = ({ content, onClose, onSavePlan, studyPlanHistory = [
                       title: `Training Plan (${format(new Date(), 'MMM d, yyyy')})`
                     };
                     onSavePlan(planWithMeta);
+                    // Show snackbar notification
+                    setSnackbarOpen(true);
                   }
                   // Reset to preferences step without closing
                   setActiveStep(0);
@@ -574,12 +579,20 @@ const StudyPlanGenerator = ({ content, onClose, onSavePlan, studyPlanHistory = [
                   setStudyPlan(null);
                 }}
               >
-                Done
+                Save
               </Button>
             )}
           </>
         )}
       </Box>
+      {/* Snackbar notification */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        message="Training plan has been saved!"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Paper>
   );
 };

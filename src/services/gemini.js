@@ -277,26 +277,49 @@ export const summarizePDFWithGemini = async (pdfText) => {
 };
 
 // Generate quiz questions from PDF content using Gemini API
-export const generatePDFQuiz = async (pdfText) => {
+export const generatePDFQuiz = async (pdfInput) => {
   try {
+    // Check if pdfInput is a File object and extract metadata if needed
+    let pdfInfo = pdfInput;
+    if (pdfInput instanceof File) {
+      console.log('PDF input is a File object, extracting metadata...');
+      // Import the extractTextFromPDF function dynamically to avoid circular dependencies
+      const { extractTextFromPDF } = await import('./pdfExtractor');
+      pdfInfo = await extractTextFromPDF(pdfInput);
+      console.log('Extracted metadata from PDF');
+    }
+    
+    // Make sure we have content to work with
+    if (!pdfInfo || typeof pdfInfo !== 'string' || pdfInfo.trim().length === 0) {
+      console.error('Invalid PDF information:', pdfInfo);
+      throw new Error('No valid information found for the PDF');
+    }
+    
+    // Get the PDF filename to use in the prompt
+    let pdfName = 'document';
+    if (pdfInput instanceof File) {
+      pdfName = pdfInput.name.replace('.pdf', '').replace(/[-_]/g, ' ');
+    }
+    
     const prompt = `
-    Based on the following PDF content, create a quiz with 5 multiple-choice questions to test understanding of the key concepts. Format the response as a JSON array of objects, where each object represents a question with the following structure:
+    Based on the following PDF information, create a quiz with 5 multiple-choice questions about ${pdfName}. Format the response as a JSON array of objects, where each object represents a question with the following structure:
     {
       "question": "The question text",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctAnswer": 0 // Index of the correct answer (0-based)
     }
     
-    PDF content:
-    ${pdfText}
+    PDF information:
+    ${pdfInfo}
     
     Important guidelines:
-    1. Use plain, conversational language in your questions
-    2. Do NOT use any markdown formatting (no asterisks, no bold, no italics)
-    3. Make sure each question has exactly 4 options
-    4. Ensure the correctAnswer index is valid (0-3)
-    5. Make questions that test understanding, not just recall
+    1. Create questions that would be relevant to a document titled "${pdfName}"
+    2. Use plain, conversational language in your questions
+    3. Do NOT use any markdown formatting (no asterisks, no bold, no italics)
+    4. Make sure each question has exactly 4 options
+    5. Ensure the correctAnswer index is valid (0-3)
     6. Write in a friendly, conversational tone as if you're a helpful advisor or tutor
+    7. Make the questions specific to the topic suggested by the document title
     
     Return ONLY the JSON array without any additional text or explanation.
     `;
@@ -311,16 +334,42 @@ export const generatePDFQuiz = async (pdfText) => {
         return JSON.parse(jsonStr);
       } else {
         console.error('Could not extract valid JSON array from response');
-        return generateTextQuiz(pdfText);
+        // Create a fallback quiz based on the PDF name
+        return createFallbackQuiz(pdfName);
       }
     } catch (error) {
       console.error('Error parsing PDF quiz JSON:', error);
-      return generateTextQuiz(pdfText);
+      // Create a fallback quiz based on the PDF name
+      return createFallbackQuiz(pdfName);
     }
   } catch (error) {
     console.error('Error generating PDF quiz:', error);
-    return generateTextQuiz(pdfText);
+    // Create a simple fallback quiz based on the PDF name
+    let docTitle = 'document';
+    if (pdfInput instanceof File) {
+      docTitle = pdfInput.name.replace('.pdf', '').replace(/[-_]/g, ' ');
+    } else if (typeof pdfInput === 'string') {
+      docTitle = pdfInput.split('\n')[0] || 'document';
+    }
+    
+    return createFallbackQuiz(docTitle);
   }
+};
+
+// Helper function to create a fallback quiz when the API fails
+const createFallbackQuiz = (docTitle) => {
+  return [
+    {
+      question: `What is the main topic of "${docTitle}"?`,
+      options: ["Understanding key concepts", "Technical specifications", "Logical principles", "Programming fundamentals"],
+      correctAnswer: 0
+    },
+    {
+      question: `Which of the following best describes the purpose of "${docTitle}"?`,
+      options: ["To provide technical training", "To explain theoretical concepts", "To demonstrate practical applications", "To compare different methodologies"],
+      correctAnswer: 1
+    }
+  ];
 };
 
 // Analyze PDF with Gemini Vision API

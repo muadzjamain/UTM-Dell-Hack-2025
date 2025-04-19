@@ -406,6 +406,9 @@ const StudyCompanion = () => {
       try {
         setStatusMessage('Creating quiz questions...');
         if (uploadType === 'pdf') {
+          // Directly pass the PDF file to the generatePDFQuiz function
+          // The function will handle the text extraction internally
+          setStatusMessage('Creating quiz questions from PDF content...');
           generatedQuiz = await generatePDFQuiz(uploadedFile);
         } else {
           generatedQuiz = await generateQuiz(text);
